@@ -1,0 +1,50 @@
+cmake_minimum_required(VERSION 3.20)
+project(twfm LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_package(svision3 REQUIRED)
+
+add_executable(demo src/main.cpp)
+target_link_libraries(demo PRIVATE svision3::svision3)
+
+set_target_properties(demo PROPERTIES
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME          "SVision3Demo"
+    MACOSX_BUNDLE_BUNDLE_VERSION       "0.0.1"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "0.0.1"
+)
+
+find_package(Catch2 REQUIRED)
+include(CTest)
+include(Catch)
+
+add_executable(unit_tests tests/test_example.cpp)
+target_link_libraries(unit_tests PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(unit_tests)
+
+install(TARGETS demo
+    BUNDLE  DESTINATION .
+    RUNTIME DESTINATION bin
+)
+
+set(CPACK_PACKAGE_NAME    "SVision3Demo")
+set(CPACK_PACKAGE_VERSION "0.0.1")
+set(CPACK_PACKAGE_VENDOR  "Your Company")
+
+if(WIN32)
+    set(CPACK_GENERATOR "WIX")
+    # Regenerate this GUID if you fork or rename the product.
+    set(CPACK_WIX_UPGRADE_GUID "E8A52B7C-3F4D-4A1E-9B6C-D2F8E3A1C057")
+elseif(APPLE)
+    set(CPACK_GENERATOR "DragNDrop")
+    set(CPACK_DMG_VOLUME_NAME "SVision3Demo")
+elseif(UNIX)
+    set(CPACK_GENERATOR "DEB;RPM")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Company <info@yourcompany.com>")
+    set(CPACK_RPM_PACKAGE_LICENSE "MIT")
+endif()
+
+include(CPack)
