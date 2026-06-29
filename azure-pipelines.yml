@@ -1,0 +1,284 @@
+trigger:
+  branches:
+    include: [main, dev]
+
+pr:
+  branches:
+    include: ['*']
+
+stages:
+  - stage: Build
+    displayName: Build and Test
+    jobs:
+      - job: build
+        strategy:
+          matrix:
+            Linux_Debug:
+              imageName: ubuntu-latest
+              buildType: Debug
+              preset: conan-debug
+            Linux_Release:
+              imageName: ubuntu-latest
+              buildType: Release
+              preset: conan-release
+            Windows_Debug:
+              imageName: windows-latest
+              buildType: Debug
+              preset: conan-debug
+            Windows_Release:
+              imageName: windows-latest
+              buildType: Release
+              preset: conan-release
+            # macOS: disabled, uncomment to re-enable
+            #macOS_Debug:
+            #  imageName: macos-latest
+            #  buildType: Debug
+            #  preset: conan-debug
+            #macOS_Release:
+            #  imageName: macos-latest
+            #  buildType: Release
+            #  preset: conan-release
+        pool:
+          vmImage: $(imageName)
+        steps:
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y libgl-dev libx11-dev libxext-dev \
+                libwayland-dev libxkbcommon-dev libdbus-1-dev \
+                libcairo2-dev libfontconfig1-dev pkg-config
+            condition: eq(variables['Agent.OS'], 'Linux')
+            displayName: Install system dependencies (Linux)
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.12'
+
+          - script: pip install conan
+            displayName: Install Conan
+
+          - script: conan profile detect
+            displayName: Detect Conan profile
+
+          - script: conan install . -s build_type=$(buildType) --build=missing
+            displayName: Conan install
+
+          - script: cmake --preset $(preset)
+            displayName: Configure
+
+          - script: cmake --build build/$(buildType)
+            displayName: Build
+
+          - script: ctest --test-dir build/$(buildType) -C $(buildType) --output-on-failure
+            displayName: Test
+
+  - stage: Package
+    displayName: Package
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: package_linux
+        displayName: DEB + RPM (Linux)
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y cmake python3-pip dpkg-dev rpm \
+                libgl-dev libx11-dev libxext-dev \
+                libwayland-dev libxkbcommon-dev libdbus-1-dev \
+                libcairo2-dev libfontconfig1-dev pkg-config
+            displayName: Install system dependencies
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.12'
+
+          - script: pip install conan
+            displayName: Install Conan
+
+          - script: conan profile detect
+            displayName: Detect Conan profile
+
+          - script: conan install . -s build_type=Release --build=missing
+            displayName: Conan install
+
+          - script: cmake --preset conan-release
+            displayName: Configure
+
+          - script: cmake --build build/Release
+            displayName: Build
+
+          - script: cd build/Release && cpack -C Release
+            displayName: Package
+
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: build/Release
+              Contents: |
+                *.deb
+                *.rpm
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: SVision3Demo-linux
+
+      - job: package_appimage
+        displayName: AppImage (Linux)
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y cmake python3-pip wget libfuse2 \
+                libgl-dev libx11-dev libxext-dev \
+                libwayland-dev libxkbcommon-dev libdbus-1-dev \
+                libcairo2-dev libfontconfig1-dev pkg-config
+            displayName: Install system dependencies
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.12'
+
+          - script: pip install conan
+            displayName: Install Conan
+
+          - script: conan profile detect
+            displayName: Detect Conan profile
+
+          - script: conan install . -s build_type=Release --build=missing
+            displayName: Conan install
+
+          - script: cmake --preset conan-release
+            displayName: Configure
+
+          - script: cmake --build build/Release
+            displayName: Build
+
+          - script: cmake --install build/Release --prefix AppDir/usr
+            displayName: Install into AppDir
+
+          - script: |
+              wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+              chmod +x linuxdeploy-x86_64.AppImage
+            displayName: Download linuxdeploy
+
+          - script: |
+              cat > SVision3Demo.desktop <<'EOF'
+              [Desktop Entry]
+              Name=SVision3Demo
+              Exec=twfm
+              Icon=svision3demo
+              Type=Application
+              Categories=Utility;
+              EOF
+              python3 -c "
+              import struct, zlib
+              w,h=64,64
+              raw=b''.join(b'\x00'+bytes([0,120,212]*w) for _ in range(h))
+              def mk(t,d):
+                  c=struct.pack('>I',len(d))+t+d
+                  return c+struct.pack('>I',zlib.crc32(c[4:])&0xffffffff)
+              data=(b'\x89PNG\r\n\x1a\n'
+                  +mk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))
+                  +mk(b'IDAT',zlib.compress(raw))
+                  +mk(b'IEND',b''))
+              open('svision3demo.png','wb').write(data)
+              "
+            displayName: Create .desktop file and icon
+
+          - script: >
+              ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run
+              --appdir AppDir
+              -d SVision3Demo.desktop
+              -i svision3demo.png
+              --output appimage
+            displayName: Build AppImage
+
+          - task: CopyFiles@2
+            inputs:
+              Contents: '*.AppImage'
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: SVision3Demo-appimage
+
+      - job: package_msi
+        displayName: MSI (Windows)
+        pool:
+          vmImage: windows-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.12'
+
+          - script: pip install conan
+            displayName: Install Conan
+
+          - script: conan profile detect
+            displayName: Detect Conan profile
+
+          - script: conan install . -s build_type=Release --build=missing
+            displayName: Conan install
+
+          - script: cmake --preset conan-release
+            displayName: Configure
+
+          - script: cmake --build build/Release --config Release
+            displayName: Build
+
+          - script: cd build/Release && cpack -C Release
+            displayName: Package MSI
+
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: build/Release
+              Contents: '*.msi'
+              TargetFolder: $(Build.ArtifactStagingDirectory)
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)
+              artifact: SVision3Demo-windows
+
+      # macOS bundle: disabled, uncomment to re-enable
+      #- job: package_macos
+      #  displayName: Bundle (macOS)
+      #  pool:
+      #    vmImage: macos-latest
+      #  steps:
+      #    - task: UsePythonVersion@0
+      #      inputs:
+      #        versionSpec: '3.12'
+      #
+      #    - script: pip install conan
+      #      displayName: Install Conan
+      #
+      #    - script: conan profile detect
+      #      displayName: Detect Conan profile
+      #
+      #    - script: conan install . -s build_type=Release --build=missing
+      #      displayName: Conan install
+      #
+      #    - script: cmake --preset conan-release
+      #      displayName: Configure
+      #
+      #    - script: cmake --build build/Release
+      #      displayName: Build
+      #
+      #    - script: cd build/Release && cpack -C Release
+      #      displayName: Package DMG
+      #
+      #    - task: CopyFiles@2
+      #      inputs:
+      #        SourceFolder: build/Release
+      #        Contents: '*.dmg'
+      #        TargetFolder: $(Build.ArtifactStagingDirectory)
+      #
+      #    - task: PublishPipelineArtifact@1
+      #      inputs:
+      #        targetPath: $(Build.ArtifactStagingDirectory)
+      #        artifact: SVision3Demo-macos
