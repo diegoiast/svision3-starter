@@ -27,6 +27,13 @@ int main(int argc, char *argv[]) {
     auto editor = std::make_unique<ScintillaEdit>();
     editor->set_lexer("cpp");
     editor->set_line_numbers(true);
+    // additionalSelectionTyping defaults to off in Scintilla itself (see
+    // Editor::FilterSelections()) -- without this, Alt+Shift+Up/Down still
+    // creates a real multi-caret rectangular selection, but the moment you
+    // type, Scintilla silently drops every range but the main one before
+    // inserting. Not a bug in the port; matches stock Notepad++/SciTE
+    // unless the host app opts in like this.
+    editor->set_multiple_selection(true);
     editor->set_text("// SCINTILLA-SVISION3-LIVE-TEST -- if you can see and edit this, it works.\n"
                      "int main() {\n"
                      "    return 0;\n"
