@@ -26,6 +26,7 @@ int main(int argc, char *argv[]) {
 
     auto editor = std::make_unique<ScintillaEdit>();
     editor->set_lexer("cpp");
+    editor->set_line_numbers(true);
     editor->set_text("// SCINTILLA-SVISION3-LIVE-TEST -- if you can see and edit this, it works.\n"
                      "int main() {\n"
                      "    return 0;\n"
