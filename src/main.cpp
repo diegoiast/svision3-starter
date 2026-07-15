@@ -25,7 +25,11 @@ int main(int argc, char *argv[]) {
     auto layout = std::make_unique<VBoxLayout>();
 
     auto editor = std::make_unique<ScintillaEdit>();
-    editor->set_text("SCINTILLA-SVISION3-LIVE-TEST -- if you can see and edit this, it works.\n");
+    editor->set_lexer("cpp");
+    editor->set_text("// SCINTILLA-SVISION3-LIVE-TEST -- if you can see and edit this, it works.\n"
+                     "int main() {\n"
+                     "    return 0;\n"
+                     "}\n");
     // stretch=1: makes the editor fill the remaining window height instead
     // of just its size_hint() (200px, ScintillaEdit's fallback default --
     // see its header). A caller that forgot this entirely used to get a
