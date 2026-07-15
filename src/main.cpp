@@ -6,7 +6,9 @@
 #include "toolkit/layout.hpp"
 #include "toolkit/window.hpp"
 #include <cstdio>
+#include <memory>
 #include <string>
+#include <vector>
 
 using namespace toolkit;
 
@@ -38,6 +40,21 @@ int main(int argc, char *argv[]) {
                      "int main() {\n"
                      "    return 0;\n"
                      "}\n");
+
+    // Demonstrates ScintillaEdit::set_context_menu_extra_items(): edits
+    // Scintilla's own built-in Undo/Redo/Cut/Copy/Paste/Delete/Select-All
+    // menu in place instead of replacing it (set_context_menu_handler()
+    // does full replacement, if that's ever needed instead). "Format
+    // Document" is shown disabled (grayed out, does nothing if clicked)
+    // since this demo doesn't actually implement it -- proving disabled
+    // items work the same way here as in the built-in menu (see
+    // context_menu_smoke_test.cpp).
+    editor->set_context_menu_extra_items([](std::vector<MenuItem> &items, Point) {
+        items.push_back(MenuItem::sep());
+        items.push_back(MenuItem::action("Say Hello", [] { std::printf("Hello from the demo context menu!\n"); }));
+        items.push_back(MenuItem::action("Format Document", [] {}, /*enabled=*/false));
+    });
+
     // stretch=1: makes the editor fill the remaining window height instead
     // of just its size_hint() (200px, ScintillaEdit's fallback default --
     // see its header). A caller that forgot this entirely used to get a
