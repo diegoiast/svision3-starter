@@ -7,7 +7,11 @@ class TwfmRecipe(ConanFile):
     generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
-        self.requires("svision3/0.0.1")
+        # Tracks the current local svision3 checkout's version string
+        # (svision3/conanfile.py's `version =`), not a released 0.0.1 --
+        # rebuild with `conan create ~/src/diego/svision3` after pulling
+        # svision3 changes.
+        self.requires("svision3/0.0.1-dev")
 
     def build_requirements(self):
         self.test_requires("catch2/[>=3.0 <4.0]")

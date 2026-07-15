@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24) # LINK_GROUP:RESCAN, needed by scintilla-svision3 below
 project(twfm LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -7,8 +7,20 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(svision3 REQUIRED)
 
+# Phase A (see ../scintilla-svision3/../scintilla-svision3-design.md):
+# scintilla-svision3 isn't packaged via conan yet, so it's pulled in as a
+# sibling checkout, same as it does for scintilla-code/lexilla itself.
+# EXCLUDE_FROM_ALL keeps its own demo/test executables out of `cmake --build`
+# by default -- only the scintilla-svision3/scintilla-core/lexzilla library
+# targets this project's `demo` actually links against get built.
+set(BUILD_QT OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../scintilla-svision3 scintilla-svision3-build EXCLUDE_FROM_ALL)
+
 add_executable(demo src/main.cpp)
-target_link_libraries(demo PRIVATE svision3::svision3)
+target_link_libraries(demo PRIVATE
+    svision3::svision3
+    $<LINK_GROUP:RESCAN,scintilla-svision3,scintilla-core,lexzilla>
+)
 
 set_target_properties(demo PROPERTIES
     MACOSX_BUNDLE TRUE
