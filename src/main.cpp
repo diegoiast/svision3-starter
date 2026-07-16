@@ -258,14 +258,12 @@ int main(int argc, char *argv[]) {
                 }
                 auto contents = std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
                 auto const lexer = lexer_for_path(*path);
-                auto const [use_tabs, width] = detect_indentation(contents);
                 edit_ptr->set_text(std::move(contents));
                 edit_ptr->set_lexer(lexer);
-                edit_ptr->set_use_tabs(use_tabs);
-                edit_ptr->set_tab_width(width);
+                edit_ptr->detect_and_apply_indentation();
                 window->set_focused_widget(edit_ptr);
-                spdlog::info("Opened {} (lexer={}, indent={}{})", *path, lexer, width,
-                             use_tabs ? " tabs" : " spaces");
+                spdlog::info("Opened {} (lexer={}, indent={}{})", *path, lexer, edit_ptr->tab_width(),
+                             edit_ptr->has_use_tabs() ? " tabs" : " spaces");
             });
     });
     open_cmd->set_shortcut("Std+O");

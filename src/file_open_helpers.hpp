@@ -6,7 +6,6 @@
 #include <cctype>
 #include <string>
 #include <string_view>
-#include <utility>
 
 // Picks ScintillaEdit::set_lexer()'s lexer name from a file's extension.
 // Java/JS/TS all route through Lexilla's "cpp" lexer family (SCLEX_CPP)
@@ -39,32 +38,4 @@ inline std::string lexer_for_path(std::string_view path) {
         return "python";
     }
     return "cpp"; // c/cpp/cc/cxx/h/hpp/hxx/java/js/jsx/ts/tsx, and anything unrecognized
-}
-
-// Sniffs the file's own existing indentation convention from its first
-// indented line, rather than assuming Scintilla's own tab-width-8-and-tabs
-// default -- the same "match the document's existing style" spirit as
-// ScintillaEdit::set_auto_indent()'s enclosing_indent() step-inference, just
-// applied once up front instead of line by line. Returns {use_tabs, width}.
-inline std::pair<bool, int> detect_indentation(std::string_view text) {
-    size_t pos = 0;
-    while (pos < text.size()) {
-        auto const eol = text.find('\n', pos);
-        auto const line = text.substr(pos, eol == std::string_view::npos ? std::string_view::npos : eol - pos);
-        if (!line.empty() && line[0] == '\t') {
-            return {true, 8}; // tabs -- keep Scintilla's own default width
-        }
-        if (!line.empty() && line[0] == ' ') {
-            size_t width = 0;
-            while (width < line.size() && line[width] == ' ') {
-                ++width;
-            }
-            return {false, static_cast<int>(width)};
-        }
-        if (eol == std::string_view::npos) {
-            break;
-        }
-        pos = eol + 1;
-    }
-    return {true, 8}; // no indented line found -- keep Scintilla's own defaults
 }
