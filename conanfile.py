@@ -12,6 +12,13 @@ class TwfmRecipe(ConanFile):
         # rebuild with `conan create ~/src/diego/svision3` after pulling
         # svision3 changes.
         self.requires("svision3/0.0.1-dev")
+        # Already pulled in transitively via svision3, but only as a build
+        # dependency of svision3 itself -- its Debug-config CMake target
+        # data came back empty when relying on that alone (a Conan package-
+        # variant mismatch, not a real header-only/missing-config gap).
+        # Requiring it directly here gives twfm's own conan install a
+        # properly resolved Debug variant for main.cpp's spdlog::info() calls.
+        self.requires("spdlog/1.14.1")
 
     def build_requirements(self):
         self.test_requires("catch2/[>=3.0 <4.0]")

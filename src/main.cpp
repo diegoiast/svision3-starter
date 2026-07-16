@@ -3,11 +3,16 @@
 
 #include "scintilla_svision3/scintilla_edit.hpp"
 #include "toolkit/application.hpp"
+#include "toolkit/button.hpp"
+#include "toolkit/command.hpp"
 #include "toolkit/layout.hpp"
+#include "toolkit/line_input.hpp"
 #include "toolkit/window.hpp"
-#include <cstdio>
+#include <spdlog/spdlog.h>
+#include <cctype>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace toolkit;
@@ -29,6 +34,11 @@ int main(int argc, char *argv[]) {
     auto editor = std::make_unique<ScintillaEdit>();
     editor->set_lexer("cpp");
     editor->set_line_numbers(true);
+    // No frame -- ScintillaEdit's constructor turns one on by default
+    // (rounded, per the active theme's corner_radius, since Widget's
+    // default frame drawing has no per-widget corner override), but a
+    // full-bleed editor without one reads better in this demo's layout.
+    editor->set_frame(false);
     // additionalSelectionTyping defaults to off in Scintilla itself (see
     // Editor::FilterSelections()) -- without this, Alt+Shift+Up/Down still
     // creates a real multi-caret rectangular selection, but the moment you
@@ -51,9 +61,76 @@ int main(int argc, char *argv[]) {
     // context_menu_smoke_test.cpp).
     editor->set_context_menu_extra_items([](std::vector<MenuItem> &items, Point) {
         items.push_back(MenuItem::sep());
-        items.push_back(MenuItem::action("Say Hello", [] { std::printf("Hello from the demo context menu!\n"); }));
+        items.push_back(MenuItem::action("Say Hello", [] { spdlog::info("Hello from the demo context menu!"); }));
         items.push_back(MenuItem::action("Format Document", [] {}, /*enabled=*/false));
     });
+
+    // Demonstrates ScintillaEdit::set_on_char_added() driving
+    // show_autocomplete() for real, the way an app actually would:
+    // SCN_CHARADDED fires after every real typed character (not
+    // programmatic set_text() -- see set_on_char_added()'s doc comment),
+    // and the app decides here whether/what to suggest. This demo's
+    // "language" is just five fixed fruit names filtered by whatever
+    // word-in-progress has been typed so far; a real app would consult a
+    // symbol table or language server instead, but the *trigger* mechanism
+    // -- react to each inserted character, decide, call show_autocomplete()
+    // -- is the same either way. current_word (and the callback closure
+    // capturing it) lives as long as `window` itself does, both being tied
+    // to `app`'s lifetime here in main(), so capturing it by reference is
+    // safe for the whole app.run() below.
+    auto *edit_ptr = editor.get();
+    auto current_word = std::string{};
+    editor->set_on_char_added([edit_ptr, &current_word](int ch) {
+        if (std::isalnum(ch) || ch == '_') {
+            current_word.push_back(static_cast<char>(ch));
+        } else {
+            current_word.clear();
+            return;
+        }
+        if (current_word.size() < 2) {
+            return;
+        }
+        static constexpr std::string_view candidates[] = {"apple", "banana", "cherry", "date", "elderberry"};
+        auto matches = std::vector<std::string>{};
+        for (auto candidate : candidates) {
+            if (candidate.size() >= current_word.size() &&
+                candidate.compare(0, current_word.size(), current_word) == 0) {
+                matches.emplace_back(candidate);
+            }
+        }
+        if (!matches.empty()) {
+            edit_ptr->show_autocomplete(static_cast<int>(current_word.size()), matches);
+        }
+    });
+
+    // F2: manual "show it regardless of what's typed" override alongside
+    // the real typing-driven trigger above -- Widget::add_command(), not
+    // toolkit::Window::on_key. A widget-scoped Command is only ever checked
+    // while this widget (or an ancestor) is the focused one -- Window::
+    // handle_key()'s "focused widget and its parents" loop calls
+    // handle_key_impl(), which matches commands_ before handle_key() itself
+    // -- unlike Window::on_key, which fires for every key regardless of
+    // focus (that's what needed the manual is_focused() check this replaces).
+    auto autocomplete_cmd =
+        Command::create("Show Autocomplete", [edit_ptr] {
+            edit_ptr->show_autocomplete(0, {"apple", "banana", "cherry", "date", "elderberry"});
+        });
+    autocomplete_cmd->set_shortcut("F2");
+    editor->add_command(autocomplete_cmd);
+
+    // A button and a line input, purely to have other focusable widgets in
+    // the window to test focus transitions against: click into the line
+    // input or the button, then back into the editor, to confirm the
+    // editor's caret/keyboard input correctly follow real
+    // toolkit::Window::set_focused_widget() changes -- not just the F2/
+    // autocomplete-popup-specific path above.
+    auto toolbar = std::make_unique<HBoxLayout>();
+    auto button = std::make_unique<Button>("Click me");
+    button->on_click = [] { spdlog::info("Button clicked"); };
+    auto line_input = std::make_unique<LineInput>("Type here to test focus");
+    toolbar->add_widget(std::move(button));
+    toolbar->add_widget(std::move(line_input), 1);
+    layout->add_widget(std::move(toolbar));
 
     // stretch=1: makes the editor fill the remaining window height instead
     // of just its size_hint() (200px, ScintillaEdit's fallback default --
@@ -64,11 +141,20 @@ int main(int argc, char *argv[]) {
     // real app.
     layout->add_widget(std::move(editor), 1);
     window->set_root(std::move(layout));
+    // Nothing focuses the editor on its own after set_root() -- a real app
+    // would normally get real focus from the user's first click, but typing
+    // fast enough right after launch could beat that. Without this,
+    // toolkit::Window::open_popup() (opened by show_autocomplete()) saves
+    // focused_widget_==nullptr as what to restore once the popup closes,
+    // which then blurs the editor a second time, unprotected, instead of
+    // restoring it -- no caret, no keyboard input, until something else
+    // (like a real click) focuses it again.
+    window->set_focused_widget(edit_ptr);
 
     if (!screenshot_path.empty()) {
         window->relayout();
         auto ok = window->save_to_png(screenshot_path);
-        std::printf("Screenshot saved to '%s': %s\n", screenshot_path.c_str(), ok ? "success" : "failed");
+        spdlog::info("Screenshot saved to '{}': {}", screenshot_path, ok ? "success" : "failed");
         return ok ? 0 : 1;
     }
 

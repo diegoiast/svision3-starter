@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(svision3 REQUIRED)
+# Not a direct twfm dependency, but already in the graph transitively via
+# svision3 (spdlog/1.14.1 in its conanfile.py) -- Conan's CMakeDeps already
+# generates its find-module here, so this just uses what's already fetched
+# rather than adding a new requirement, for demo/main.cpp's spdlog::info()
+# calls.
+find_package(spdlog REQUIRED)
 
 # Phase A (see ../scintilla-svision3/../scintilla-svision3-design.md):
 # scintilla-svision3 isn't packaged via conan yet, so it's pulled in as a
@@ -19,6 +25,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../scintilla-svision3 scintilla-svi
 add_executable(demo src/main.cpp)
 target_link_libraries(demo PRIVATE
     svision3::svision3
+    spdlog::spdlog
     $<LINK_GROUP:RESCAN,scintilla-svision3,scintilla-core,lexzilla>
 )
 
