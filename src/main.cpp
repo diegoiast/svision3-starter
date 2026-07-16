@@ -35,6 +35,11 @@ int main(int argc, char *argv[]) {
     editor->set_lexer("cpp");
     editor->set_line_numbers(true);
     editor->set_code_folding(true);
+    // Click margin 1 (just left of the fold margin) to toggle a bookmark on
+    // that line -- no F-key needed, unlike autocomplete/calltips: a margin
+    // click is already the natural trigger (same as folding's margin 2),
+    // there's no "typed the right text" precondition to fake here.
+    editor->set_bookmarks(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
@@ -126,7 +131,7 @@ int main(int argc, char *argv[]) {
         }
     });
 
-    // F2: manual "show it regardless of what's typed" override alongside
+    // F9: manual "show it regardless of what's typed" override alongside
     // the real typing-driven trigger above -- Widget::add_command(), not
     // toolkit::Window::on_key. A widget-scoped Command is only ever checked
     // while this widget (or an ancestor) is the focused one -- Window::
@@ -134,15 +139,30 @@ int main(int argc, char *argv[]) {
     // handle_key_impl(), which matches commands_ before handle_key() itself
     // -- unlike Window::on_key, which fires for every key regardless of
     // focus (that's what needed the manual is_focused() check this replaces).
+    // F2/Shift+F2 used to be autocomplete's manual trigger, but now drive
+    // bookmark navigation instead (see below) -- F9 took over here.
     auto autocomplete_cmd =
         Command::create("Show Autocomplete", [edit_ptr] {
             edit_ptr->show_autocomplete(0, {"apple", "banana", "cherry", "date", "elderberry"});
         });
-    autocomplete_cmd->set_shortcut("F2");
+    autocomplete_cmd->set_shortcut("F9");
     editor->add_command(autocomplete_cmd);
 
-    // F3: same idea as F2, but for the calltip -- shows apple's signature
-    // regardless of what's actually typed, for a quick manual check.
+    // F2/Shift+F2: jump to the next/previous bookmarked line (wrapping
+    // around at either end) -- click the margin between the line numbers
+    // and the fold +/- icons to actually set one.
+    auto next_bookmark_cmd = Command::create("Next Bookmark", [edit_ptr] { edit_ptr->goto_next_bookmark(); });
+    next_bookmark_cmd->set_shortcut("F2");
+    editor->add_command(next_bookmark_cmd);
+
+    auto prev_bookmark_cmd =
+        Command::create("Previous Bookmark", [edit_ptr] { edit_ptr->goto_previous_bookmark(); });
+    prev_bookmark_cmd->set_shortcut("Shift+F2");
+    editor->add_command(prev_bookmark_cmd);
+
+    // F3: same idea as F9's autocomplete override, but for the calltip --
+    // shows apple's signature regardless of what's actually typed, for a
+    // quick manual check.
     auto calltip_cmd = Command::create("Show Calltip", [edit_ptr] {
         edit_ptr->show_calltip(edit_ptr->current_position(), "void apple(int freshness)");
     });
