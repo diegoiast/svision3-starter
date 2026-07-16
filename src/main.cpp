@@ -240,6 +240,26 @@ int main(int argc, char *argv[]) {
         // instead of returning to the document.
         window->set_focused_widget(edit_ptr);
     };
+
+    // Toggles a lint-style warning annotation below "print_result(0);" --
+    // demonstrates set_annotation()/clear_annotation(): a per-*line*
+    // decoration (rendered as extra virtual lines right below the line,
+    // boxed by default) rather than indicate_range()'s per-byte-*range* one.
+    constexpr int magic_number_line = 9; // "        print_result(0);" in the sample text above.
+    auto annotation_shown = std::make_shared<bool>(false);
+    auto toggle_annotation_button = std::make_unique<Button>("Toggle Annotation");
+    toggle_annotation_button->on_click = [edit_ptr, window, annotation_shown] {
+        if (*annotation_shown) {
+            edit_ptr->clear_annotation(magic_number_line);
+        } else {
+            edit_ptr->set_annotation(magic_number_line, "warning: magic number 0, consider a named constant",
+                                     Color::rgb(0.8f, 0.5f, 0.0f));
+        }
+        *annotation_shown = !*annotation_shown;
+        spdlog::info("Annotation {}", *annotation_shown ? "shown" : "cleared");
+        window->set_focused_widget(edit_ptr);
+    };
+
     // Toggles a bookmark on the caret's current line -- a button-driven
     // alternative to clicking the bookmark margin, which is a thin (16px),
     // unlabeled strip that's easy to miss ("F2 does nothing" almost always
@@ -262,6 +282,7 @@ int main(int argc, char *argv[]) {
 
     auto line_input = std::make_unique<LineInput>("Type here to test focus");
     toolbar->add_widget(std::move(button));
+    toolbar->add_widget(std::move(toggle_annotation_button));
     toolbar->add_widget(std::move(toggle_bookmark_button));
     toolbar->add_widget(std::move(next_bookmark_button));
     toolbar->add_widget(std::move(line_input), 1);
