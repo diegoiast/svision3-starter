@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
     auto editor = std::make_unique<ScintillaEdit>();
     editor->set_lexer("cpp");
     editor->set_line_numbers(true);
+    editor->set_code_folding(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
