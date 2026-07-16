@@ -56,6 +56,15 @@ int main(int argc, char *argv[]) {
     // whatever line the caret is on -- self-contained at the widget
     // level, requires set_line_numbers(true) already being on above.
     editor->set_bold_current_line_number(true);
+    // Indents new lines to match block-nesting depth (fold levels) and
+    // dedents closing brackets/tags as they're typed -- self-contained at
+    // the widget level like the two features above, driven entirely by
+    // set_lexer("cpp")'s own fold-level computation, no per-language app
+    // code needed. The per-level step is inferred from whatever
+    // indentation convention is already in the surrounding document (see
+    // set_auto_indent()'s doc comment), so it matches this sample text's
+    // own 4-space-per-level style without any extra configuration here.
+    editor->set_auto_indent(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
