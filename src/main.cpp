@@ -260,6 +260,19 @@ int main(int argc, char *argv[]) {
         window->set_focused_widget(edit_ptr);
     };
 
+    // Toggles word wrap -- the sample text's first line (the banner
+    // comment) is long enough to visibly wrap once the window is narrower
+    // than it, demonstrating both the reflow itself and that the
+    // horizontal scrollbar correctly disappears once wrapping is on (see
+    // set_word_wrap()'s doc comment for the ModifyScrollBars() fix that
+    // made that part actually true).
+    auto toggle_wrap_button = std::make_unique<Button>("Toggle Word Wrap");
+    toggle_wrap_button->on_click = [edit_ptr, window] {
+        edit_ptr->set_word_wrap(!edit_ptr->has_word_wrap());
+        spdlog::info("Word wrap {}", edit_ptr->has_word_wrap() ? "on" : "off");
+        window->set_focused_widget(edit_ptr);
+    };
+
     // Toggles a bookmark on the caret's current line -- a button-driven
     // alternative to clicking the bookmark margin, which is a thin (16px),
     // unlabeled strip that's easy to miss ("F2 does nothing" almost always
@@ -283,6 +296,7 @@ int main(int argc, char *argv[]) {
     auto line_input = std::make_unique<LineInput>("Type here to test focus");
     toolbar->add_widget(std::move(button));
     toolbar->add_widget(std::move(toggle_annotation_button));
+    toolbar->add_widget(std::move(toggle_wrap_button));
     toolbar->add_widget(std::move(toggle_bookmark_button));
     toolbar->add_widget(std::move(next_bookmark_button));
     toolbar->add_widget(std::move(line_input), 1);
