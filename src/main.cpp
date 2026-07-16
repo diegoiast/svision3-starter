@@ -78,9 +78,31 @@ int main(int argc, char *argv[]) {
     // capturing it) lives as long as `window` itself does, both being tied
     // to `app`'s lifetime here in main(), so capturing it by reference is
     // safe for the whole app.run() below.
+    // Demonstrates ScintillaEdit::show_calltip(): same "react to
+    // SCN_CHARADDED, decide, show" trigger as autocomplete above, but for
+    // signature help instead -- typing '(' right after one of this demo's
+    // five fruit names shows its (made up) signature, mimicking a real
+    // app's "just opened a function call" moment. A real app would look the
+    // function up in a symbol table instead of this fixed list.
+    static constexpr std::pair<std::string_view, std::string_view> signatures[] = {
+        {"apple", "void apple(int freshness)"},
+        {"banana", "void banana(bool ripe)"},
+        {"cherry", "void cherry(int count, bool pitted)"},
+    };
+
     auto *edit_ptr = editor.get();
     auto current_word = std::string{};
     editor->set_on_char_added([edit_ptr, &current_word](int ch) {
+        if (ch == '(') {
+            for (auto const &[name, signature] : signatures) {
+                if (current_word == name) {
+                    edit_ptr->show_calltip(edit_ptr->current_position(), std::string(signature));
+                    break;
+                }
+            }
+            current_word.clear();
+            return;
+        }
         if (std::isalnum(ch) || ch == '_') {
             current_word.push_back(static_cast<char>(ch));
         } else {
@@ -117,6 +139,14 @@ int main(int argc, char *argv[]) {
         });
     autocomplete_cmd->set_shortcut("F2");
     editor->add_command(autocomplete_cmd);
+
+    // F3: same idea as F2, but for the calltip -- shows apple's signature
+    // regardless of what's actually typed, for a quick manual check.
+    auto calltip_cmd = Command::create("Show Calltip", [edit_ptr] {
+        edit_ptr->show_calltip(edit_ptr->current_position(), "void apple(int freshness)");
+    });
+    calltip_cmd->set_shortcut("F3");
+    editor->add_command(calltip_cmd);
 
     // A button and a line input, purely to have other focusable widgets in
     // the window to test focus transitions against: click into the line
