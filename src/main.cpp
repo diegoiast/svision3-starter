@@ -47,6 +47,11 @@ int main(int argc, char *argv[]) {
     // bookmark/annotation/indicator toggles, this is the kind of thing a
     // real app would just leave on all the time, so no menu entry for it.
     editor->set_current_line_highlight(true);
+    // Same story: highlights every occurrence of whatever word the caret
+    // is on, live, as it moves -- entirely self-contained at the widget
+    // level (see set_highlight_word_under_cursor()'s doc comment), no app
+    // wiring needed beyond turning it on.
+    editor->set_highlight_word_under_cursor(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
@@ -306,6 +311,83 @@ int main(int argc, char *argv[]) {
 
     actions_menu->add_separator();
 
+    // Find field: Enter searches forward from the current selection,
+    // wrapping around the document -- ScintillaEdit::find_and_select()
+    // does the actual work (SCI_SEARCHINTARGET under the hood, core
+    // Scintilla's own text search). Deliberately doesn't restore focus to
+    // the editor afterward, unlike every other action here: a real "Find"
+    // field keeps focus so pressing Enter again immediately repeats the
+    // search for the next match, the same as a browser's own find bar.
+    auto find_input = std::make_unique<LineInput>("Find...");
+    auto *find_input_ptr = find_input.get();
+    find_input->on_submit = [edit_ptr](std::string const &text, LineInput &) {
+        if (text.empty()) {
+            return;
+        }
+        auto const found = edit_ptr->find_and_select(text);
+        spdlog::info("Find \"{}\": {}", text, found ? "found" : "not found");
+    };
+
+    // Same search as the Find field's own Enter key, exposed in the menu
+    // too -- reads whatever's currently typed there rather than taking
+    // its own separate input.
+    actions_menu->add_action("Find Next", [edit_ptr, find_input_ptr] {
+        auto const &text = find_input_ptr->text();
+        if (text.empty()) {
+            return;
+        }
+        auto const found = edit_ptr->find_and_select(text);
+        spdlog::info("Find Next \"{}\": {}", text, found ? "found" : "not found");
+    });
+
+    // Demonstrates mark_all()/clear_indicator(): highlights every
+    // occurrence of the Find field's text at once, unlike Find Next's
+    // one-at-a-time selection -- indicator 10, distinct from "Mark Word"'s
+    // own 8 and the built-in highlight-word-under-cursor feature's
+    // reserved 9. An on/off toggle, same convention as every other
+    // Toggle-prefixed action in this menu: click once to mark, click again
+    // to clear -- not a one-shot "sync to whatever's in the field now"
+    // action with no way back off.
+    constexpr int search_mark_indicator = 10;
+    edit_ptr->set_indicator_style(search_mark_indicator, Color::rgb(0.95f, 0.75f, 0.0f), IndicatorStyle::Box);
+    auto mark_all_shown = std::make_shared<bool>(false);
+    actions_menu->add_action("Toggle Mark All", [edit_ptr, find_input_ptr, window, search_mark_indicator,
+                                                 mark_all_shown] {
+        if (*mark_all_shown) {
+            edit_ptr->clear_indicator(search_mark_indicator);
+            *mark_all_shown = false;
+            spdlog::info("Mark All cleared");
+        } else {
+            auto const &text = find_input_ptr->text();
+            if (text.empty()) {
+                return;
+            }
+            auto const count = edit_ptr->mark_all(search_mark_indicator, text);
+            spdlog::info("Mark All \"{}\": {} occurrence(s)", text, count);
+            *mark_all_shown = true;
+        }
+        window->set_focused_widget(edit_ptr);
+    });
+
+    // Demonstrates replace_all(): a fixed, concrete demo case (rather than
+    // wiring up a full Replace dialog, out of scope for this demo) --
+    // renames every "total" in the sample text to "sum", as one single
+    // undo step (Ctrl+Z undoes the whole thing at once).
+    actions_menu->add_action("Replace All \"total\" -> \"sum\"", [edit_ptr, window] {
+        auto const count = edit_ptr->replace_all("total", "sum");
+        spdlog::info("Replaced {} occurrence(s) of \"total\" with \"sum\"", count);
+        window->set_focused_widget(edit_ptr);
+    });
+
+    // Demonstrates goto_line() -- jumps to the (fixed, for this demo)
+    // print_result() function definition further down the sample text.
+    actions_menu->add_action("Go to print_result()", [edit_ptr, window] {
+        edit_ptr->goto_line(14);
+        window->set_focused_widget(edit_ptr);
+    });
+
+    actions_menu->add_separator();
+
     // Demonstrates ScintillaEdit::on_theme_changed(): toolkit::Theme::
     // set_current() calls Theme::notify_theme_changed(), which reaches
     // every window (Application::notify_theme_changed()) and, from there,
@@ -329,9 +411,8 @@ int main(int argc, char *argv[]) {
     auto actions_button = std::make_unique<Button>("Actions");
     actions_button->set_menu(actions_menu);
 
-    auto line_input = std::make_unique<LineInput>("Type here to test focus");
     toolbar->add_widget(std::move(actions_button));
-    toolbar->add_widget(std::move(line_input), 1);
+    toolbar->add_widget(std::move(find_input), 1);
     layout->add_widget(std::move(toolbar));
 
     // stretch=1: makes the editor fill the remaining window height instead
