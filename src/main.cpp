@@ -242,8 +242,9 @@ int main(int argc, char *argv[]) {
             .title("Open File")
             .file_must_exist(true)
             .add_filter("C/C++/Java/JS/TS Files", "*.c *.cpp *.cc *.cxx *.h *.hpp *.hxx *.java *.js *.jsx *.ts *.tsx")
+            .add_filter("Python Files", "*.py *.pyw")
             .add_filter("JSON Files", "*.json")
-            .add_filter("XML/HTML Files", "*.xml *.html *.htm")
+            .add_filter("XML/HTML/SVG Files", "*.xml *.html *.htm *.svg")
             .add_filter("All Files", "*")
             .open()
             .then([edit_ptr, window](FileDialog::Result path) {

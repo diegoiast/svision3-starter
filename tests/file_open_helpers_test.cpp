@@ -15,8 +15,12 @@ TEST_CASE("lexer_for_path picks the right lexer by extension", "[file_open]") {
     REQUIRE(lexer_for_path("page.xml") == "xml");
     REQUIRE(lexer_for_path("page.html") == "xml");
     REQUIRE(lexer_for_path("page.htm") == "xml");
-    REQUIRE(lexer_for_path("README") == "cpp");    // no extension -- falls back
-    REQUIRE(lexer_for_path("notes.txt") == "cpp"); // unrecognized -- falls back
+    REQUIRE(lexer_for_path("icon.svg") == "xml"); // SVG is XML under a different extension
+    REQUIRE(lexer_for_path("script.py") == "python");
+    REQUIRE(lexer_for_path("script.pyw") == "python");
+    REQUIRE(lexer_for_path("SCRIPT.PY") == "python"); // case-insensitive
+    REQUIRE(lexer_for_path("README") == "cpp");        // no extension -- falls back
+    REQUIRE(lexer_for_path("notes.txt") == "cpp");     // unrecognized -- falls back
 }
 
 TEST_CASE("detect_indentation sniffs the first indented line's style", "[file_open]") {
