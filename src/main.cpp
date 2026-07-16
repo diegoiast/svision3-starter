@@ -7,6 +7,9 @@
 #include "toolkit/command.hpp"
 #include "toolkit/layout.hpp"
 #include "toolkit/line_input.hpp"
+#include "toolkit/menu.hpp"
+#include "toolkit/theme.hpp"
+#include "toolkit/theme_factory.hpp"
 #include "toolkit/window.hpp"
 #include <spdlog/spdlog.h>
 #include <cctype>
@@ -173,40 +176,103 @@ int main(int argc, char *argv[]) {
     // focus (that's what needed the manual is_focused() check this replaces).
     // F2/Shift+F2 used to be autocomplete's manual trigger, but now drive
     // bookmark navigation instead (see below) -- F9 took over here.
-    auto autocomplete_cmd =
-        Command::create("Show Autocomplete", [edit_ptr] {
-            edit_ptr->show_autocomplete(0, {"apple", "banana", "cherry", "date", "elderberry"});
-        });
+    // Every Command below is also added to the "Actions" popup menu further
+    // down, so each restores focus to the editor itself -- a menu click
+    // moves focus through the button/menu first, unlike a bare keypress
+    // which only ever reaches these while the editor already has focus.
+    auto autocomplete_cmd = Command::create("Show Autocomplete", [edit_ptr, window] {
+        edit_ptr->show_autocomplete(0, {"apple", "banana", "cherry", "date", "elderberry"});
+        window->set_focused_widget(edit_ptr);
+    });
     autocomplete_cmd->set_shortcut("F9");
     editor->add_command(autocomplete_cmd);
 
     // F2/Shift+F2: jump to the next/previous bookmarked line (wrapping
     // around at either end) -- click the margin between the line numbers
     // and the fold +/- icons to actually set one.
-    auto next_bookmark_cmd = Command::create("Next Bookmark", [edit_ptr] { edit_ptr->goto_next_bookmark(); });
+    auto next_bookmark_cmd = Command::create("Next Bookmark", [edit_ptr, window] {
+        edit_ptr->goto_next_bookmark();
+        window->set_focused_widget(edit_ptr);
+    });
     next_bookmark_cmd->set_shortcut("F2");
     editor->add_command(next_bookmark_cmd);
 
-    auto prev_bookmark_cmd =
-        Command::create("Previous Bookmark", [edit_ptr] { edit_ptr->goto_previous_bookmark(); });
+    auto prev_bookmark_cmd = Command::create("Previous Bookmark", [edit_ptr, window] {
+        edit_ptr->goto_previous_bookmark();
+        window->set_focused_widget(edit_ptr);
+    });
     prev_bookmark_cmd->set_shortcut("Shift+F2");
     editor->add_command(prev_bookmark_cmd);
 
     // F3: same idea as F9's autocomplete override, but for the calltip --
     // shows apple's signature regardless of what's actually typed, for a
     // quick manual check.
-    auto calltip_cmd = Command::create("Show Calltip", [edit_ptr] {
+    auto calltip_cmd = Command::create("Show Calltip", [edit_ptr, window] {
         edit_ptr->show_calltip(edit_ptr->current_position(), "void apple(int freshness)");
+        window->set_focused_widget(edit_ptr);
     });
     calltip_cmd->set_shortcut("F3");
     editor->add_command(calltip_cmd);
 
-    // A button and a line input, giving the demo other focusable widgets to
-    // test focus transitions against (click into the line input or the
-    // button, then back into the editor, to confirm the editor's caret/
-    // keyboard input correctly follow real
-    // toolkit::Window::set_focused_widget() changes) -- the button also
-    // demonstrates indicate_range()/clear_indicator_range(): toggles a
+    // Every demo action (autocomplete/calltip's F9/F3/F2/Shift+F2 Commands
+    // above, plus the toggles below) lives in one "Actions" dropdown
+    // instead of a row of individual buttons -- toolkit::Button::set_menu()
+    // + toolkit::Menu::add_action(), the same Menu type set_context_menu_
+    // extra_items() already builds for the editor's own right-click menu.
+    // Commands added here keep their printable_shortcut() visible in the
+    // menu (Menu::paint() already reads it), so F9/F3/F2/Shift+F2 show up
+    // as a reminder even though this menu is a second, equivalent way to
+    // trigger them.
+    auto actions_menu = std::make_shared<Menu>("Actions");
+    actions_menu->add_action(autocomplete_cmd);
+    actions_menu->add_action(calltip_cmd);
+    actions_menu->add_action(next_bookmark_cmd);
+    actions_menu->add_action(prev_bookmark_cmd);
+    actions_menu->add_separator();
+
+    // Toggles a bookmark on the caret's current line -- a menu-driven
+    // alternative to clicking the bookmark margin, which is a thin (16px),
+    // unlabeled strip that's easy to miss ("F2 does nothing" almost always
+    // means no bookmark exists yet, not that F2 itself is broken --
+    // tests/bookmark_smoke_test.cpp's Part 5 exercises the exact F2/
+    // Shift+F2 Command wiring end-to-end and confirms it reaches the editor
+    // correctly whether or not the editor currently has focus).
+    actions_menu->add_action("Toggle Bookmark", [edit_ptr, window] {
+        edit_ptr->toggle_bookmark(edit_ptr->current_line());
+        window->set_focused_widget(edit_ptr);
+    });
+
+    // Toggles word wrap -- the sample text's first line (the banner
+    // comment) is long enough to visibly wrap once the window is narrower
+    // than it, demonstrating both the reflow itself and that the
+    // horizontal scrollbar correctly disappears once wrapping is on (see
+    // set_word_wrap()'s doc comment for the ModifyScrollBars() fix that
+    // made that part actually true).
+    actions_menu->add_action("Toggle Word Wrap", [edit_ptr, window] {
+        edit_ptr->set_word_wrap(!edit_ptr->has_word_wrap());
+        spdlog::info("Word wrap {}", edit_ptr->has_word_wrap() ? "on" : "off");
+        window->set_focused_widget(edit_ptr);
+    });
+
+    // Toggles a lint-style warning annotation below "print_result(0);" --
+    // demonstrates set_annotation()/clear_annotation(): a per-*line*
+    // decoration (rendered as extra virtual lines right below the line,
+    // boxed by default) rather than indicate_range()'s per-byte-*range* one.
+    constexpr int magic_number_line = 9; // "        print_result(0);" in the sample text above.
+    auto annotation_shown = std::make_shared<bool>(false);
+    actions_menu->add_action("Toggle Annotation", [edit_ptr, window, annotation_shown] {
+        if (*annotation_shown) {
+            edit_ptr->clear_annotation(magic_number_line);
+        } else {
+            edit_ptr->set_annotation(magic_number_line, "warning: magic number 0, consider a named constant",
+                                     Color::rgb(0.8f, 0.5f, 0.0f));
+        }
+        *annotation_shown = !*annotation_shown;
+        spdlog::info("Annotation {}", *annotation_shown ? "shown" : "cleared");
+        window->set_focused_widget(edit_ptr);
+    });
+
+    // Demonstrates indicate_range()/clear_indicator_range(): toggles a
     // squiggly-underline indicator on "main" (the word on the 2nd line,
     // "int main() {") each click. Finding that word is demo-owned logic --
     // the library only knows how to mark/clear a given byte range, not
@@ -215,10 +281,7 @@ int main(int argc, char *argv[]) {
     constexpr int word_indicator = 8; // IndicatorNumbers::Container -- 0-7 are reserved for lexers.
     edit_ptr->set_indicator_style(word_indicator, Color::rgb(0.8f, 0.0f, 0.0f));
     auto word_marked = std::make_shared<bool>(false);
-
-    auto toolbar = std::make_unique<HBoxLayout>();
-    auto button = std::make_unique<Button>("Mark word");
-    button->on_click = [edit_ptr, window, word_marked] {
+    actions_menu->add_action("Mark Word", [edit_ptr, window, word_marked] {
         auto const content = edit_ptr->text();
         auto const line1_start = content.find('\n') + 1;
         auto const word_pos = content.find("main", line1_start);
@@ -234,71 +297,36 @@ int main(int argc, char *argv[]) {
         }
         *word_marked = !*word_marked;
         spdlog::info("Word indicator {}", *word_marked ? "set on 'main'" : "cleared");
-        // Give focus back to the editor -- clicking the button itself moved
-        // it there (toolkit::Window::set_focused_widget()), and without
-        // this the caret/keyboard input would stay stuck on the button
-        // instead of returning to the document.
         window->set_focused_widget(edit_ptr);
-    };
+    });
 
-    // Toggles a lint-style warning annotation below "print_result(0);" --
-    // demonstrates set_annotation()/clear_annotation(): a per-*line*
-    // decoration (rendered as extra virtual lines right below the line,
-    // boxed by default) rather than indicate_range()'s per-byte-*range* one.
-    constexpr int magic_number_line = 9; // "        print_result(0);" in the sample text above.
-    auto annotation_shown = std::make_shared<bool>(false);
-    auto toggle_annotation_button = std::make_unique<Button>("Toggle Annotation");
-    toggle_annotation_button->on_click = [edit_ptr, window, annotation_shown] {
-        if (*annotation_shown) {
-            edit_ptr->clear_annotation(magic_number_line);
-        } else {
-            edit_ptr->set_annotation(magic_number_line, "warning: magic number 0, consider a named constant",
-                                     Color::rgb(0.8f, 0.5f, 0.0f));
-        }
-        *annotation_shown = !*annotation_shown;
-        spdlog::info("Annotation {}", *annotation_shown ? "shown" : "cleared");
-        window->set_focused_widget(edit_ptr);
-    };
+    actions_menu->add_separator();
 
-    // Toggles word wrap -- the sample text's first line (the banner
-    // comment) is long enough to visibly wrap once the window is narrower
-    // than it, demonstrating both the reflow itself and that the
-    // horizontal scrollbar correctly disappears once wrapping is on (see
-    // set_word_wrap()'s doc comment for the ModifyScrollBars() fix that
-    // made that part actually true).
-    auto toggle_wrap_button = std::make_unique<Button>("Toggle Word Wrap");
-    toggle_wrap_button->on_click = [edit_ptr, window] {
-        edit_ptr->set_word_wrap(!edit_ptr->has_word_wrap());
-        spdlog::info("Word wrap {}", edit_ptr->has_word_wrap() ? "on" : "off");
+    // Demonstrates ScintillaEdit::on_theme_changed(): toolkit::Theme::
+    // set_current() calls Theme::notify_theme_changed(), which reaches
+    // every window (Application::notify_theme_changed()) and, from there,
+    // every widget's own on_theme_changed() -- the editor included -- so
+    // this is the real end-to-end path, not a direct call into the editor.
+    // ThemeStyle::System resolves through Theme::detect_system_style() (see
+    // ThemeFactory::create()) -- the same style the app already launched
+    // with (e.g. "Plasma 6" if that's the desktop) -- so this only flips
+    // the light/dark ColorScheme, it doesn't switch the app to a whole
+    // different theme family.
+    auto dark_mode = std::make_shared<bool>(false);
+    actions_menu->add_action("Toggle Dark Theme", [edit_ptr, window, dark_mode] {
+        *dark_mode = !*dark_mode;
+        Theme::set_current(
+            ThemeFactory::create(ThemeStyle::System, *dark_mode ? ColorScheme::Dark : ColorScheme::Light));
+        spdlog::info("Theme: {}", *dark_mode ? "dark" : "light");
         window->set_focused_widget(edit_ptr);
-    };
+    });
 
-    // Toggles a bookmark on the caret's current line -- a button-driven
-    // alternative to clicking the bookmark margin, which is a thin (16px),
-    // unlabeled strip that's easy to miss ("F2 does nothing" almost always
-    // means no bookmark exists yet, not that F2 itself is broken --
-    // tests/bookmark_smoke_test.cpp's Part 5 exercises the exact F2/
-    // Shift+F2 Command wiring end-to-end and confirms it reaches the editor
-    // correctly whether or not the editor currently has focus).
-    auto toggle_bookmark_button = std::make_unique<Button>("Toggle Bookmark");
-    toggle_bookmark_button->on_click = [edit_ptr, window] {
-        edit_ptr->toggle_bookmark(edit_ptr->current_line());
-        window->set_focused_widget(edit_ptr);
-    };
-
-    // Same action as the F2 shortcut above, exposed as a button too.
-    auto next_bookmark_button = std::make_unique<Button>("Next Bookmark");
-    next_bookmark_button->on_click = [edit_ptr, window] {
-        edit_ptr->goto_next_bookmark();
-        window->set_focused_widget(edit_ptr);
-    };
+    auto toolbar = std::make_unique<HBoxLayout>();
+    auto actions_button = std::make_unique<Button>("Actions");
+    actions_button->set_menu(actions_menu);
 
     auto line_input = std::make_unique<LineInput>("Type here to test focus");
-    toolbar->add_widget(std::move(button));
-    toolbar->add_widget(std::move(toggle_annotation_button));
-    toolbar->add_widget(std::move(toggle_wrap_button));
-    toolbar->add_widget(std::move(toggle_bookmark_button));
-    toolbar->add_widget(std::move(next_bookmark_button));
+    toolbar->add_widget(std::move(actions_button));
     toolbar->add_widget(std::move(line_input), 1);
     layout->add_widget(std::move(toolbar));
 
