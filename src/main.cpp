@@ -52,6 +52,10 @@ int main(int argc, char *argv[]) {
     // level (see set_highlight_word_under_cursor()'s doc comment), no app
     // wiring needed beyond turning it on.
     editor->set_highlight_word_under_cursor(true);
+    // Same story again: bolds the line-number margin's own text for
+    // whatever line the caret is on -- self-contained at the widget
+    // level, requires set_line_numbers(true) already being on above.
+    editor->set_bold_current_line_number(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
