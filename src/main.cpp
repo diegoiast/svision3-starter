@@ -43,6 +43,10 @@ int main(int argc, char *argv[]) {
     // click is already the natural trigger (same as folding's margin 2),
     // there's no "typed the right text" precondition to fake here.
     editor->set_bookmarks(true);
+    // The classic "current line" highlight most editors show -- unlike the
+    // bookmark/annotation/indicator toggles, this is the kind of thing a
+    // real app would just leave on all the time, so no menu entry for it.
+    editor->set_current_line_highlight(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
