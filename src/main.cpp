@@ -276,6 +276,14 @@ int main(int argc, char *argv[]) {
         window->set_focused_widget(edit_ptr);
     });
 
+    // Toggles space/tab visibility (SCI_SETVIEWWS) -- every space in the
+    // sample text's indentation becomes a visible centered dot once on.
+    actions_menu->add_action("Toggle Whitespace", [edit_ptr, window] {
+        edit_ptr->set_show_whitespace(!edit_ptr->has_show_whitespace());
+        spdlog::info("Whitespace {}", edit_ptr->has_show_whitespace() ? "visible" : "hidden");
+        window->set_focused_widget(edit_ptr);
+    });
+
     // Toggles a lint-style warning annotation below "print_result(0);" --
     // demonstrates set_annotation()/clear_annotation(): a per-*line*
     // decoration (rendered as extra virtual lines right below the line,
