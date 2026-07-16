@@ -40,7 +40,7 @@ find_package(Catch2 REQUIRED)
 include(CTest)
 include(Catch)
 
-add_executable(unit_tests tests/test_example.cpp)
+add_executable(unit_tests tests/test_example.cpp tests/file_open_helpers_test.cpp)
 target_link_libraries(unit_tests PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(unit_tests)
 

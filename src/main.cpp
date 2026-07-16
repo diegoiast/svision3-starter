@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: 2026 Diego Iastrubni <diegoiast@gmail.com>
 
+#include "file_open_helpers.hpp"
 #include "scintilla_svision3/scintilla_edit.hpp"
 #include "toolkit/application.hpp"
 #include "toolkit/button.hpp"
 #include "toolkit/command.hpp"
+#include "toolkit/file_dialog.hpp"
 #include "toolkit/layout.hpp"
 #include "toolkit/line_input.hpp"
 #include "toolkit/menu.hpp"
@@ -13,9 +15,11 @@
 #include "toolkit/window.hpp"
 #include <spdlog/spdlog.h>
 #include <cctype>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using namespace toolkit;
@@ -226,6 +230,46 @@ int main(int argc, char *argv[]) {
     prev_bookmark_cmd->set_shortcut("Shift+F2");
     editor->add_command(prev_bookmark_cmd);
 
+    // Std+O: loads a file from disk and picks the lexer + indentation style
+    // to match it -- set_lexer() from the extension (lexer_for_path()), and
+    // tab-width/use-tabs from the file's own first indented line
+    // (detect_indentation()), so a freshly-opened file's auto-indent
+    // (set_auto_indent(), already on below) continues in whatever style
+    // that file already uses instead of Scintilla's own tab-width-8-tabs
+    // default.
+    auto open_cmd = Command::create("Open...", [edit_ptr, window] {
+        FileDialog(window)
+            .title("Open File")
+            .file_must_exist(true)
+            .add_filter("C/C++/Java/JS/TS Files", "*.c *.cpp *.cc *.cxx *.h *.hpp *.hxx *.java *.js *.jsx *.ts *.tsx")
+            .add_filter("JSON Files", "*.json")
+            .add_filter("XML/HTML Files", "*.xml *.html *.htm")
+            .add_filter("All Files", "*")
+            .open()
+            .then([edit_ptr, window](FileDialog::Result path) {
+                if (!path) {
+                    return;
+                }
+                auto f = std::ifstream(*path);
+                if (!f) {
+                    spdlog::warn("Could not open file: {}", *path);
+                    return;
+                }
+                auto contents = std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+                auto const lexer = lexer_for_path(*path);
+                auto const [use_tabs, width] = detect_indentation(contents);
+                edit_ptr->set_text(std::move(contents));
+                edit_ptr->set_lexer(lexer);
+                edit_ptr->set_use_tabs(use_tabs);
+                edit_ptr->set_tab_width(width);
+                window->set_focused_widget(edit_ptr);
+                spdlog::info("Opened {} (lexer={}, indent={}{})", *path, lexer, width,
+                             use_tabs ? " tabs" : " spaces");
+            });
+    });
+    open_cmd->set_shortcut("Std+O");
+    editor->add_command(open_cmd);
+
     // F3: same idea as F9's autocomplete override, but for the calltip --
     // shows apple's signature regardless of what's actually typed, for a
     // quick manual check.
@@ -246,6 +290,7 @@ int main(int argc, char *argv[]) {
     // as a reminder even though this menu is a second, equivalent way to
     // trigger them.
     auto actions_menu = std::make_shared<Menu>("Actions");
+    actions_menu->add_action(open_cmd);
     actions_menu->add_action(autocomplete_cmd);
     actions_menu->add_action(calltip_cmd);
     actions_menu->add_action(next_bookmark_cmd);
