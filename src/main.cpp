@@ -54,7 +54,21 @@ int main(int argc, char *argv[]) {
     editor->set_multiple_selection(true);
     editor->set_text("// SCINTILLA-SVISION3-LIVE-TEST -- if you can see and edit this, it works.\n"
                      "int main() {\n"
+                     "    int total = 0;\n"
+                     "    for (int i = 0; i < 10; i++) {\n"
+                     "        total += i;\n"
+                     "    }\n"
+                     "    if (total > 0) {\n"
+                     "        print_result(total);\n"
+                     "    } else {\n"
+                     "        print_result(0);\n"
+                     "    }\n"
                      "    return 0;\n"
+                     "}\n"
+                     "\n"
+                     "void print_result(int value) {\n"
+                     "    // TODO: replace with real formatting\n"
+                     "    printf(\"result: %d\\n\", value);\n"
                      "}\n");
 
     // Demonstrates ScintillaEdit::set_context_menu_extra_items(): edits
@@ -77,13 +91,10 @@ int main(int argc, char *argv[]) {
     // programmatic set_text() -- see set_on_char_added()'s doc comment),
     // and the app decides here whether/what to suggest. This demo's
     // "language" is just five fixed fruit names filtered by whatever
-    // word-in-progress has been typed so far; a real app would consult a
+    // word-in-progress precedes the caret; a real app would consult a
     // symbol table or language server instead, but the *trigger* mechanism
     // -- react to each inserted character, decide, call show_autocomplete()
-    // -- is the same either way. current_word (and the callback closure
-    // capturing it) lives as long as `window` itself does, both being tied
-    // to `app`'s lifetime here in main(), so capturing it by reference is
-    // safe for the whole app.run() below.
+    // -- is the same either way.
     // Demonstrates ScintillaEdit::show_calltip(): same "react to
     // SCN_CHARADDED, decide, show" trigger as autocomplete above, but for
     // signature help instead -- typing '(' right after one of this demo's
@@ -97,37 +108,58 @@ int main(int argc, char *argv[]) {
     };
 
     auto *edit_ptr = editor.get();
-    auto current_word = std::string{};
-    editor->set_on_char_added([edit_ptr, &current_word](int ch) {
+    // The word immediately before `end` (a document position), scanning
+    // backward over alnum/'_' bytes -- re-derived from the real document on
+    // every call below instead of accumulated char-by-char across calls.
+    // An earlier version tracked a `current_word` string that only ever
+    // grew on SCN_CHARADDED and cleared on a non-word character, which
+    // silently drifted out of sync with the document the moment Backspace/
+    // Delete/cancel-and-retype entered the picture (SCN_CHARADDED never
+    // fires for deletions) -- found live: type "cher" (completion shows,
+    // correct), Escape, Backspace, retype "r": the tracked word became
+    // "cherr", one character ahead of the real "cher", so
+    // show_autocomplete()'s len_entered no longer matched the actual
+    // document and nothing appeared. Deriving fresh from the document every
+    // time is self-correcting regardless of what happened in between.
+    auto word_before = [](std::string const &content, size_t end) {
+        auto start = end;
+        while (start > 0 &&
+               (std::isalnum(static_cast<unsigned char>(content[start - 1])) || content[start - 1] == '_')) {
+            --start;
+        }
+        return content.substr(start, end - start);
+    };
+    editor->set_on_char_added([edit_ptr, word_before](int ch) {
+        auto const pos = edit_ptr->current_position();
+        auto const content = edit_ptr->text();
+
         if (ch == '(') {
+            auto const word = word_before(content, static_cast<size_t>(pos) - 1); // before the '(' itself
             for (auto const &[name, signature] : signatures) {
-                if (current_word == name) {
-                    edit_ptr->show_calltip(edit_ptr->current_position(), std::string(signature));
+                if (word == name) {
+                    edit_ptr->show_calltip(pos, std::string(signature));
                     break;
                 }
             }
-            current_word.clear();
             return;
         }
-        if (std::isalnum(ch) || ch == '_') {
-            current_word.push_back(static_cast<char>(ch));
-        } else {
-            current_word.clear();
+        if (!(std::isalnum(ch) || ch == '_')) {
             return;
         }
-        if (current_word.size() < 2) {
+
+        auto const word = word_before(content, static_cast<size_t>(pos));
+        if (word.size() < 2) {
             return;
         }
         static constexpr std::string_view candidates[] = {"apple", "banana", "cherry", "date", "elderberry"};
         auto matches = std::vector<std::string>{};
         for (auto candidate : candidates) {
-            if (candidate.size() >= current_word.size() &&
-                candidate.compare(0, current_word.size(), current_word) == 0) {
+            if (candidate.size() >= word.size() && candidate.compare(0, word.size(), word) == 0) {
                 matches.emplace_back(candidate);
             }
         }
         if (!matches.empty()) {
-            edit_ptr->show_autocomplete(static_cast<int>(current_word.size()), matches);
+            edit_ptr->show_autocomplete(static_cast<int>(word.size()), matches);
         }
     });
 
@@ -169,17 +201,69 @@ int main(int argc, char *argv[]) {
     calltip_cmd->set_shortcut("F3");
     editor->add_command(calltip_cmd);
 
-    // A button and a line input, purely to have other focusable widgets in
-    // the window to test focus transitions against: click into the line
-    // input or the button, then back into the editor, to confirm the
-    // editor's caret/keyboard input correctly follow real
-    // toolkit::Window::set_focused_widget() changes -- not just the F2/
-    // autocomplete-popup-specific path above.
+    // A button and a line input, giving the demo other focusable widgets to
+    // test focus transitions against (click into the line input or the
+    // button, then back into the editor, to confirm the editor's caret/
+    // keyboard input correctly follow real
+    // toolkit::Window::set_focused_widget() changes) -- the button also
+    // demonstrates indicate_range()/clear_indicator_range(): toggles a
+    // squiggly-underline indicator on "main" (the word on the 2nd line,
+    // "int main() {") each click. Finding that word is demo-owned logic --
+    // the library only knows how to mark/clear a given byte range, not
+    // which word to pick, same "app decides content" split as autocomplete/
+    // calltips.
+    constexpr int word_indicator = 8; // IndicatorNumbers::Container -- 0-7 are reserved for lexers.
+    edit_ptr->set_indicator_style(word_indicator, Color::rgb(0.8f, 0.0f, 0.0f));
+    auto word_marked = std::make_shared<bool>(false);
+
     auto toolbar = std::make_unique<HBoxLayout>();
-    auto button = std::make_unique<Button>("Click me");
-    button->on_click = [] { spdlog::info("Button clicked"); };
+    auto button = std::make_unique<Button>("Mark word");
+    button->on_click = [edit_ptr, window, word_marked] {
+        auto const content = edit_ptr->text();
+        auto const line1_start = content.find('\n') + 1;
+        auto const word_pos = content.find("main", line1_start);
+        if (word_pos == std::string::npos) {
+            return;
+        }
+        auto const start = static_cast<int>(word_pos);
+        constexpr int length = 4; // "main"
+        if (*word_marked) {
+            edit_ptr->clear_indicator_range(word_indicator, start, length);
+        } else {
+            edit_ptr->indicate_range(word_indicator, start, length);
+        }
+        *word_marked = !*word_marked;
+        spdlog::info("Word indicator {}", *word_marked ? "set on 'main'" : "cleared");
+        // Give focus back to the editor -- clicking the button itself moved
+        // it there (toolkit::Window::set_focused_widget()), and without
+        // this the caret/keyboard input would stay stuck on the button
+        // instead of returning to the document.
+        window->set_focused_widget(edit_ptr);
+    };
+    // Toggles a bookmark on the caret's current line -- a button-driven
+    // alternative to clicking the bookmark margin, which is a thin (16px),
+    // unlabeled strip that's easy to miss ("F2 does nothing" almost always
+    // means no bookmark exists yet, not that F2 itself is broken --
+    // tests/bookmark_smoke_test.cpp's Part 5 exercises the exact F2/
+    // Shift+F2 Command wiring end-to-end and confirms it reaches the editor
+    // correctly whether or not the editor currently has focus).
+    auto toggle_bookmark_button = std::make_unique<Button>("Toggle Bookmark");
+    toggle_bookmark_button->on_click = [edit_ptr, window] {
+        edit_ptr->toggle_bookmark(edit_ptr->current_line());
+        window->set_focused_widget(edit_ptr);
+    };
+
+    // Same action as the F2 shortcut above, exposed as a button too.
+    auto next_bookmark_button = std::make_unique<Button>("Next Bookmark");
+    next_bookmark_button->on_click = [edit_ptr, window] {
+        edit_ptr->goto_next_bookmark();
+        window->set_focused_widget(edit_ptr);
+    };
+
     auto line_input = std::make_unique<LineInput>("Type here to test focus");
     toolbar->add_widget(std::move(button));
+    toolbar->add_widget(std::move(toggle_bookmark_button));
+    toolbar->add_widget(std::move(next_bookmark_button));
     toolbar->add_widget(std::move(line_input), 1);
     layout->add_widget(std::move(toolbar));
 
