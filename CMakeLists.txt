@@ -17,16 +17,16 @@ find_package(spdlog REQUIRED)
 # scintilla-svision3 isn't packaged via conan yet, so it's pulled in as a
 # sibling checkout, same as it does for scintilla-code/lexilla itself.
 # EXCLUDE_FROM_ALL keeps its own demo/test executables out of `cmake --build`
-# by default -- only the scintilla-svision3/scintilla-core/lexzilla library
+# by default -- only the scintilla-svision3/scintilla-core/lexilla library
 # targets this project's `demo` actually links against get built.
 set(BUILD_QT OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../scintilla-svision3 scintilla-svision3-build EXCLUDE_FROM_ALL)
 
-add_executable(demo src/main.cpp)
+add_executable(demo src/main.cpp src/file_open_helpers.cpp)
 target_link_libraries(demo PRIVATE
     svision3::svision3
     spdlog::spdlog
-    $<LINK_GROUP:RESCAN,scintilla-svision3,scintilla-core,lexzilla>
+    $<LINK_GROUP:RESCAN,scintilla-svision3,scintilla-core,lexilla>
 )
 
 set_target_properties(demo PROPERTIES
@@ -40,7 +40,7 @@ find_package(Catch2 REQUIRED)
 include(CTest)
 include(Catch)
 
-add_executable(unit_tests tests/test_example.cpp tests/file_open_helpers_test.cpp)
+add_executable(unit_tests tests/test_example.cpp tests/file_open_helpers_test.cpp src/file_open_helpers.cpp)
 target_link_libraries(unit_tests PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(unit_tests)
 

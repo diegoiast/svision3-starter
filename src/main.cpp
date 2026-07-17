@@ -13,10 +13,10 @@
 #include "toolkit/theme.hpp"
 #include "toolkit/theme_factory.hpp"
 #include "toolkit/window.hpp"
-#include <spdlog/spdlog.h>
 #include <cctype>
 #include <fstream>
 #include <memory>
+#include <spdlog/spdlog.h>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
     }
 
     Application app;
+    app.use_xdg_icons();
 
     auto window = app.create_window("SVision3 demo", {600, 400});
     auto layout = std::make_unique<VBoxLayout>();
@@ -110,7 +111,8 @@ int main(int argc, char *argv[]) {
     // context_menu_smoke_test.cpp).
     editor->set_context_menu_extra_items([](std::vector<MenuItem> &items, Point) {
         items.push_back(MenuItem::sep());
-        items.push_back(MenuItem::action("Say Hello", [] { spdlog::info("Hello from the demo context menu!"); }));
+        items.push_back(MenuItem::action(
+            "Say Hello", [] { spdlog::info("Hello from the demo context menu!"); }));
         items.push_back(MenuItem::action("Format Document", [] {}, /*enabled=*/false));
     });
 
@@ -152,8 +154,8 @@ int main(int argc, char *argv[]) {
     // time is self-correcting regardless of what happened in between.
     auto word_before = [](std::string const &content, size_t end) {
         auto start = end;
-        while (start > 0 &&
-               (std::isalnum(static_cast<unsigned char>(content[start - 1])) || content[start - 1] == '_')) {
+        while (start > 0 && (std::isalnum(static_cast<unsigned char>(content[start - 1])) ||
+                             content[start - 1] == '_')) {
             --start;
         }
         return content.substr(start, end - start);
@@ -163,7 +165,8 @@ int main(int argc, char *argv[]) {
         auto const content = edit_ptr->text();
 
         if (ch == '(') {
-            auto const word = word_before(content, static_cast<size_t>(pos) - 1); // before the '(' itself
+            auto const word =
+                word_before(content, static_cast<size_t>(pos) - 1); // before the '(' itself
             for (auto const &[name, signature] : signatures) {
                 if (word == name) {
                     edit_ptr->show_calltip(pos, std::string(signature));
@@ -180,7 +183,9 @@ int main(int argc, char *argv[]) {
         if (word.size() < 2) {
             return;
         }
-        static constexpr std::string_view candidates[] = {"apple", "banana", "cherry", "date", "elderberry"};
+        // FIXME: move those candidates to a public place, they are used in 2 placed
+        static constexpr std::string_view candidates[] = {"apple", "banana", "cherry", "date",
+                                                          "elderberry"};
         auto matches = std::vector<std::string>{};
         for (auto candidate : candidates) {
             if (candidate.size() >= word.size() && candidate.compare(0, word.size(), word) == 0) {
@@ -231,7 +236,7 @@ int main(int argc, char *argv[]) {
     editor->add_command(prev_bookmark_cmd);
 
     // Std+O: loads a file from disk and picks the lexer + indentation style
-    // to match it -- set_lexer() from the extension (lexer_for_path()), and
+    // to match it -- set_lexer() from the extension (lexer_for_filename()), and
     // tab-width/use-tabs from the file's own first indented line
     // (detect_indentation()), so a freshly-opened file's auto-indent
     // (set_auto_indent(), already on below) continues in whatever style
@@ -241,7 +246,11 @@ int main(int argc, char *argv[]) {
         FileDialog(window)
             .title("Open File")
             .file_must_exist(true)
-            .add_filter("C/C++/Java/JS/TS Files", "*.c *.cpp *.cc *.cxx *.h *.hpp *.hxx *.java *.js *.jsx *.ts *.tsx")
+            // FIXME: it would be nice if we had list of supported lexers/file type names. we have
+            // it in file_open_helpers
+            // FIXME: add all supported lexers
+            .add_filter("C/C++/Java/JS/TS Files",
+                        "*.c *.cpp *.cc *.cxx *.h *.hpp *.hxx *.java *.js *.jsx *.ts *.tsx")
             .add_filter("Python Files", "*.py *.pyw")
             .add_filter("JSON Files", "*.json")
             .add_filter("XML/HTML/SVG Files", "*.xml *.html *.htm *.svg")
@@ -256,14 +265,15 @@ int main(int argc, char *argv[]) {
                     spdlog::warn("Could not open file: {}", *path);
                     return;
                 }
-                auto contents = std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
-                auto const lexer = lexer_for_path(*path);
+                auto contents = std::string(std::istreambuf_iterator<char>(f),
+                                            std::istreambuf_iterator<char>());
+                auto const lexer = lexer_for_filename(*path);
                 edit_ptr->set_text(std::move(contents));
                 edit_ptr->set_lexer(lexer);
                 edit_ptr->detect_and_apply_indentation();
                 window->set_focused_widget(edit_ptr);
-                spdlog::info("Opened {} (lexer={}, indent={}{})", *path, lexer, edit_ptr->tab_width(),
-                             edit_ptr->has_use_tabs() ? " tabs" : " spaces");
+                spdlog::info("Opened {} (lexer={}, indent={}{})", *path, lexer,
+                             edit_ptr->tab_width(), edit_ptr->has_use_tabs() ? " tabs" : " spaces");
             });
     });
     open_cmd->set_shortcut("Std+O");
@@ -338,7 +348,8 @@ int main(int argc, char *argv[]) {
         if (*annotation_shown) {
             edit_ptr->clear_annotation(magic_number_line);
         } else {
-            edit_ptr->set_annotation(magic_number_line, "warning: magic number 0, consider a named constant",
+            edit_ptr->set_annotation(magic_number_line,
+                                     "warning: magic number 0, consider a named constant",
                                      Color::rgb(0.8f, 0.5f, 0.0f));
         }
         *annotation_shown = !*annotation_shown;
@@ -414,10 +425,11 @@ int main(int argc, char *argv[]) {
     // to clear -- not a one-shot "sync to whatever's in the field now"
     // action with no way back off.
     constexpr int search_mark_indicator = 10;
-    edit_ptr->set_indicator_style(search_mark_indicator, Color::rgb(0.95f, 0.75f, 0.0f), IndicatorStyle::Box);
+    edit_ptr->set_indicator_style(search_mark_indicator, Color::rgb(0.95f, 0.75f, 0.0f),
+                                  IndicatorStyle::Box);
     auto mark_all_shown = std::make_shared<bool>(false);
-    actions_menu->add_action("Toggle Mark All", [edit_ptr, find_input_ptr, window, search_mark_indicator,
-                                                 mark_all_shown] {
+    actions_menu->add_action("Toggle Mark All", [edit_ptr, find_input_ptr, window,
+                                                 search_mark_indicator, mark_all_shown] {
         if (*mark_all_shown) {
             edit_ptr->clear_indicator(search_mark_indicator);
             *mark_all_shown = false;
@@ -466,8 +478,8 @@ int main(int argc, char *argv[]) {
     auto dark_mode = std::make_shared<bool>(false);
     actions_menu->add_action("Toggle Dark Theme", [edit_ptr, window, dark_mode] {
         *dark_mode = !*dark_mode;
-        Theme::set_current(
-            ThemeFactory::create(ThemeStyle::System, *dark_mode ? ColorScheme::Dark : ColorScheme::Light));
+        Theme::set_current(ThemeFactory::create(
+            ThemeStyle::System, *dark_mode ? ColorScheme::Dark : ColorScheme::Light));
         spdlog::info("Theme: {}", *dark_mode ? "dark" : "light");
         window->set_focused_widget(edit_ptr);
     });
