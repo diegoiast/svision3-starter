@@ -26,10 +26,14 @@ using namespace toolkit;
 
 int main(int argc, char *argv[]) {
     std::string screenshot_path;
+    std::string open_path;
     for (int i = 1; i < argc; i++) {
         auto arg = std::string(argv[i]);
         if (arg.starts_with("--screenshot=")) {
             screenshot_path = arg.substr(13);
+        }
+        if (arg.starts_with("--open=")) {
+            open_path = arg.substr(7);
         }
     }
 
@@ -242,7 +246,23 @@ int main(int argc, char *argv[]) {
     // (set_auto_indent(), already on below) continues in whatever style
     // that file already uses instead of Scintilla's own tab-width-8-tabs
     // default.
-    auto open_cmd = Command::create("Open...", [edit_ptr, window] {
+    auto load_file = [edit_ptr, window](std::string const &path) {
+        auto f = std::ifstream(path);
+        if (!f) {
+            spdlog::warn("Could not open file: {}", path);
+            return;
+        }
+        auto contents = std::string(std::istreambuf_iterator<char>(f),
+                                    std::istreambuf_iterator<char>());
+        auto const lexer = lexer_for_filename(path);
+        edit_ptr->set_text(std::move(contents));
+        edit_ptr->set_lexer(lexer);
+        edit_ptr->detect_and_apply_indentation();
+        window->set_focused_widget(edit_ptr);
+        spdlog::info("Opened {} (lexer={}, indent={}{})", path, lexer, edit_ptr->tab_width(),
+                     edit_ptr->has_use_tabs() ? " tabs" : " spaces");
+    };
+    auto open_cmd = Command::create("Open...", [load_file, window] {
         FileDialog(window)
             .title("Open File")
             .file_must_exist(true)
@@ -256,28 +276,21 @@ int main(int argc, char *argv[]) {
             .add_filter("XML/HTML/SVG Files", "*.xml *.html *.htm *.svg")
             .add_filter("All Files", "*")
             .open()
-            .then([edit_ptr, window](FileDialog::Result path) {
-                if (!path) {
-                    return;
+            .then([load_file](FileDialog::Result path) {
+                if (path) {
+                    load_file(*path);
                 }
-                auto f = std::ifstream(*path);
-                if (!f) {
-                    spdlog::warn("Could not open file: {}", *path);
-                    return;
-                }
-                auto contents = std::string(std::istreambuf_iterator<char>(f),
-                                            std::istreambuf_iterator<char>());
-                auto const lexer = lexer_for_filename(*path);
-                edit_ptr->set_text(std::move(contents));
-                edit_ptr->set_lexer(lexer);
-                edit_ptr->detect_and_apply_indentation();
-                window->set_focused_widget(edit_ptr);
-                spdlog::info("Opened {} (lexer={}, indent={}{})", *path, lexer,
-                             edit_ptr->tab_width(), edit_ptr->has_use_tabs() ? " tabs" : " spaces");
             });
     });
     open_cmd->set_shortcut("Std+O");
     editor->add_command(open_cmd);
+
+    // --open=<path>: load a file straight from the command line -- the
+    // exact same path the Open... action takes, minus the dialog. Useful
+    // for testing large-file loading headlessly (with --screenshot=).
+    if (!open_path.empty()) {
+        load_file(open_path);
+    }
 
     // F3: same idea as F9's autocomplete override, but for the calltip --
     // shows apple's signature regardless of what's actually typed, for a
