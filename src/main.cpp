@@ -444,8 +444,16 @@ int main(int argc, char *argv[]) {
     // to clear -- not a one-shot "sync to whatever's in the field now"
     // action with no way back off.
     constexpr int search_mark_indicator = 10;
-    edit_ptr->set_indicator_style(search_mark_indicator, Color::rgb(0.95f, 0.75f, 0.0f),
-                                  IndicatorStyle::Box);
+    // ScintillaEdit::highlighter_color()/highlighter_alpha() -- the same
+    // theme-aware color+alpha the widget's own built-in highlight-word-
+    // under-cursor indicator uses (see its doc comment), so both read as
+    // one consistent "highlighter marker" family and both adapt the same
+    // way when the theme changes (re-applied below in "Toggle Dark Theme"
+    // too, since this indicator is app-owned -- the widget only keeps its
+    // own current-word one in sync automatically via its own
+    // on_theme_changed()).
+    edit_ptr->set_indicator_style(search_mark_indicator, edit_ptr->highlighter_color(), IndicatorStyle::Box,
+                                  edit_ptr->highlighter_alpha());
     auto mark_all_shown = std::make_shared<bool>(false);
     actions_menu->add_action("Toggle Mark All", [edit_ptr, find_input_ptr, window,
                                                  search_mark_indicator, mark_all_shown] {
@@ -495,10 +503,19 @@ int main(int argc, char *argv[]) {
     // the light/dark ColorScheme, it doesn't switch the app to a whole
     // different theme family.
     auto dark_mode = std::make_shared<bool>(false);
-    actions_menu->add_action("Toggle Dark Theme", [edit_ptr, window, dark_mode] {
+    actions_menu->add_action("Toggle Dark Theme", [edit_ptr, window, dark_mode, search_mark_indicator] {
         *dark_mode = !*dark_mode;
         Theme::set_current(ThemeFactory::create(
             ThemeStyle::System, *dark_mode ? ColorScheme::Dark : ColorScheme::Light));
+        // Theme::set_current() already reaches the editor's own
+        // on_theme_changed() (re-coloring the built-in highlight-word-
+        // under-cursor indicator automatically), but this indicator is
+        // app-owned -- set_indicator_style() re-applies to any ranges
+        // already marked too, not just future ones, so an active "Mark
+        // All" stays in sync with the new theme instead of keeping the
+        // old color until the next search.
+        edit_ptr->set_indicator_style(search_mark_indicator, edit_ptr->highlighter_color(), IndicatorStyle::Box,
+                                      edit_ptr->highlighter_alpha());
         spdlog::info("Theme: {}", *dark_mode ? "dark" : "light");
         window->set_focused_widget(edit_ptr);
     });
