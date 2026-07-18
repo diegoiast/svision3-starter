@@ -74,6 +74,12 @@ int main(int argc, char *argv[]) {
     // set_auto_indent()'s doc comment), so it matches this sample text's
     // own 4-space-per-level style without any extra configuration here.
     editor->set_auto_indent(true);
+    // Same story again: a thin light-green bar at the very edge of the
+    // widget, ahead of the line numbers, marks lines edited since the
+    // file was loaded -- the classic "unsaved changes" gutter (VS Code,
+    // Visual Studio, ...), built entirely on Scintilla's own
+    // change-history tracking, no per-edit diffing here either.
+    editor->set_modified_line_markers(true);
     // No frame -- ScintillaEdit's constructor turns one on by default
     // (rounded, per the active theme's corner_radius, since Widget's
     // default frame drawing has no per-widget corner override), but a
