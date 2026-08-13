@@ -126,8 +126,14 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
 
+      # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded switches MSVC from /Zi
+      # (shared external .pdb, written by multiple concurrent cl.exe) to /Z7
+      # (debug info embedded per-object). sccache breaks the serialization
+      # that normally makes concurrent /Zi writes to one .pdb safe, causing
+      # "cannot open program database ... use /FS" even though /FS is
+      # already passed -- /Z7 sidesteps the shared-file contention entirely.
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
 
       - name: Build
         run: cmake --build build/${{ matrix.build_type }}
