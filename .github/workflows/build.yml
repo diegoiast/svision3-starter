@@ -57,8 +57,14 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
 
+      # FETCHCONTENT_UPDATES_DISCONNECTED=ON stops FetchContent from
+      # re-checking svision3's git remote on every reconfigure (e.g. the
+      # cmake_check_build_system pass that runs on every `cmake --build`,
+      # including cpack's preinstall step in the packaging jobs downstream).
+      # Without it, that recheck needs `.git` to still be a valid repo --
+      # fragile once the tree round-trips through an artifact upload/download.
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
       - name: Build
         run: cmake --build build/${{ matrix.build_type }}
@@ -68,12 +74,18 @@ jobs:
 
       # Reused by package-linux / package-linux-appimage below so they don't
       # have to reconfigure+recompile the same Release build.
+      # include-hidden-files: actions/upload-artifact excludes dotfiles by
+      # default, which silently drops _deps/svision3-src/.git -- that's what
+      # actually caused "fatal: not a git repository" downstream. Keeping
+      # this alongside UPDATES_DISCONNECTED above as belt-and-suspenders,
+      # in case something ever still needs a working .git in that tree.
       - name: Upload build directory (Release)
         if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
           name: build-ubuntu-latest-Release
           path: build/Release
+          include-hidden-files: true
           retention-days: 1
 
   build-windows:
@@ -132,8 +144,12 @@ jobs:
       # that normally makes concurrent /Zi writes to one .pdb safe, causing
       # "cannot open program database ... use /FS" even though /FS is
       # already passed -- /Z7 sidesteps the shared-file contention entirely.
+      # FETCHCONTENT_UPDATES_DISCONNECTED=ON stops FetchContent from
+      # re-checking svision3's git remote on every reconfigure (e.g. the
+      # cmake_check_build_system pass that runs on every `cmake --build`,
+      # including cpack's preinstall step in package-msi downstream).
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
       - name: Build
         run: cmake --build build/${{ matrix.build_type }}
@@ -143,12 +159,17 @@ jobs:
 
       # Reused by package-msi below so it doesn't have to reconfigure+recompile
       # the same Release build.
+      # include-hidden-files: actions/upload-artifact excludes dotfiles by
+      # default, which silently drops _deps/svision3-src/.git -- that's what
+      # caused "fatal: not a git repository" downstream on Linux. Keeping
+      # this alongside UPDATES_DISCONNECTED above as belt-and-suspenders.
       - name: Upload build directory (Release)
         if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
           name: build-windows-latest-Release
           path: build/Release
+          include-hidden-files: true
           retention-days: 1
 
   package-linux:
@@ -222,7 +243,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SVision3Demo-linux
+          name: SVision3Demo${{ steps.version.outputs.suffix }}-linux
           path: |
             build/Release/*.deb
             build/Release/*.rpm
@@ -312,7 +333,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SVision3Demo-appimage
+          name: SVision3Demo${{ steps.version.outputs.suffix }}-appimage
           path: |
             *.AppImage
             !linuxdeploy-x86_64.AppImage
@@ -388,7 +409,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: SVision3Demo-windows
+          name: SVision3Demo${{ steps.version.outputs.suffix }}-windows
           path: build/Release/*.msi
 
   # macOS bundle: disabled, uncomment to re-enable
