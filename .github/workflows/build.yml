@@ -194,6 +194,25 @@ jobs:
       - name: Package DEB and RPM
         run: cd build/Release && cpack -C Release
 
+      - name: Show CPack logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          for f in build/Release/_CPack_Packages/**/*.log; do
+            echo "::group::$f"
+            cat "$f"
+            echo "::endgroup::"
+          done
+
+      - name: Upload CPack logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpack-logs-linux-deb
+          path: build/Release/_CPack_Packages/**/*.log
+          if-no-files-found: ignore
+
       - name: Rename packages
         shell: bash
         run: |
@@ -341,6 +360,25 @@ jobs:
 
       - name: Package MSI
         run: cd build/Release && cpack -C Release
+
+      - name: Show CPack logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          for f in build/Release/_CPack_Packages/**/*.log; do
+            echo "::group::$f"
+            cat "$f"
+            echo "::endgroup::"
+          done
+
+      - name: Upload CPack logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpack-logs-windows
+          path: build/Release/_CPack_Packages/**/*.log
+          if-no-files-found: ignore
 
       - name: Rename package
         shell: bash
