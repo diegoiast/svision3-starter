@@ -29,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgl-dev libx11-dev libxext-dev \
-            libwayland-dev libxkbcommon-dev libdbus-1-dev \
+            libwayland-dev libwayland-bin wayland-protocols libegl1-mesa-dev libxkbcommon-dev libdbus-1-dev \
             libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev zlib1g-dev pkg-config
 
       - uses: actions/setup-python@v5
@@ -160,6 +160,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Determine package suffix
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install packaging tools
         run: |
           sudo apt-get update
@@ -184,6 +194,13 @@ jobs:
       - name: Package DEB and RPM
         run: cd build/Release && cpack -C Release
 
+      - name: Rename packages
+        shell: bash
+        run: |
+          cd build/Release
+          for f in *.deb; do mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.deb"; done
+          for f in *.rpm; do mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.rpm"; done
+
       - uses: actions/upload-artifact@v4
         with:
           name: SVision3Demo-linux
@@ -198,12 +215,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Determine package suffix
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 \
             libgl-dev libx11-dev libxext-dev \
-            libwayland-dev libxkbcommon-dev libdbus-1-dev \
+            libwayland-dev libegl1-mesa-dev libxkbcommon-dev libdbus-1-dev \
             libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev zlib1g-dev pkg-config \
             libfuse2
 
@@ -256,10 +283,20 @@ jobs:
             -i svision3demo.png \
             --output appimage
 
+      - name: Rename AppImage
+        shell: bash
+        run: |
+          for f in *.AppImage; do
+            [ "$f" = "linuxdeploy-x86_64.AppImage" ] && continue
+            mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.AppImage"
+          done
+
       - uses: actions/upload-artifact@v4
         with:
           name: SVision3Demo-appimage
-          path: "*.AppImage"
+          path: |
+            *.AppImage
+            !linuxdeploy-x86_64.AppImage
 
   package-msi:
     name: Package MSI (Windows)
@@ -269,6 +306,16 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v5
+
+      - name: Determine package suffix
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -294,6 +341,12 @@ jobs:
 
       - name: Package MSI
         run: cd build/Release && cpack -C Release
+
+      - name: Rename package
+        shell: bash
+        run: |
+          cd build/Release
+          for f in *.msi; do mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.msi"; done
 
       - uses: actions/upload-artifact@v4
         with:
