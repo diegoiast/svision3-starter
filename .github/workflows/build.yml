@@ -35,7 +35,7 @@ jobs:
           #  preset: conan-release
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install system dependencies (Linux)
         if: runner.os == 'Linux'
@@ -43,7 +43,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgl-dev libx11-dev libxext-dev \
             libwayland-dev libxkbcommon-dev libdbus-1-dev \
-            libcairo2-dev libfontconfig1-dev pkg-config
+            libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev pkg-config
 
       - uses: actions/setup-python@v5
         with:
@@ -52,11 +52,20 @@ jobs:
       - name: Install Conan
         run: pip install conan
 
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-${{ matrix.build_type }}-
+            conan-${{ runner.os }}-
+
       - name: Detect Conan profile
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=${{ matrix.build_type }} --build=missing
+        run: conan install . -s build_type=${{ matrix.build_type }} -s compiler.cppstd=20 --build=missing
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
@@ -71,7 +80,7 @@ jobs:
     name: Package DEB + RPM (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install system dependencies
         run: |
@@ -79,7 +88,7 @@ jobs:
           sudo apt-get install -y cmake python3-pip dpkg-dev rpm \
             libgl-dev libx11-dev libxext-dev \
             libwayland-dev libxkbcommon-dev libdbus-1-dev \
-            libcairo2-dev libfontconfig1-dev pkg-config
+            libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev pkg-config
 
       - uses: actions/setup-python@v5
         with:
@@ -88,11 +97,20 @@ jobs:
       - name: Install Conan
         run: pip install conan
 
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-Release-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-Release-
+            conan-${{ runner.os }}-
+
       - name: Detect Conan profile
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=Release --build=missing
+        run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
 
       - name: Configure
         run: cmake --preset conan-release
@@ -114,7 +132,7 @@ jobs:
     name: Package AppImage (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install system dependencies
         run: |
@@ -122,7 +140,7 @@ jobs:
           sudo apt-get install -y cmake python3-pip \
             libgl-dev libx11-dev libxext-dev \
             libwayland-dev libxkbcommon-dev libdbus-1-dev \
-            libcairo2-dev libfontconfig1-dev pkg-config \
+            libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev pkg-config \
             libfuse2
 
       - uses: actions/setup-python@v5
@@ -132,11 +150,20 @@ jobs:
       - name: Install Conan
         run: pip install conan
 
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-Release-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-Release-
+            conan-${{ runner.os }}-
+
       - name: Detect Conan profile
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=Release --build=missing
+        run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
 
       - name: Configure
         run: cmake --preset conan-release
@@ -193,7 +220,7 @@ jobs:
     name: Package MSI (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
@@ -202,11 +229,20 @@ jobs:
       - name: Install Conan
         run: pip install conan
 
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-Release-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-${{ runner.os }}-Release-
+            conan-${{ runner.os }}-
+
       - name: Detect Conan profile
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=Release --build=missing
+        run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
 
       - name: Configure
         run: cmake --preset conan-release
@@ -227,7 +263,7 @@ jobs:
   #  name: Package Bundle (macOS)
   #  runs-on: macos-latest
   #  steps:
-  #    - uses: actions/checkout@v4
+  #    - uses: actions/checkout@v5
   #
   #    - uses: actions/setup-python@v5
   #      with:
@@ -240,7 +276,7 @@ jobs:
   #      run: conan profile detect
   #
   #    - name: Conan install
-  #      run: conan install . -s build_type=Release --build=missing
+  #      run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
   #
   #    - name: Configure
   #      run: cmake --preset conan-release
