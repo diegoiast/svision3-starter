@@ -7,32 +7,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: ${{ matrix.os }} / ${{ matrix.build_type }}
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    name: ubuntu-latest / ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            build_type: Debug
+          - build_type: Debug
             preset: conan-debug
-          - os: ubuntu-latest
-            build_type: Release
+          - build_type: Release
             preset: conan-release
-          - os: windows-latest
-            build_type: Debug
-            preset: conan-debug
-          - os: windows-latest
-            build_type: Release
-            preset: conan-release
-          # macOS: disabled, uncomment to re-enable
-          #- os: macos-latest
-          #  build_type: Debug
-          #  preset: conan-debug
-          #- os: macos-latest
-          #  build_type: Release
-          #  preset: conan-release
 
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -40,8 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgl-dev libx11-dev libxext-dev \
@@ -53,30 +37,22 @@ jobs:
           python-version: '3.12'
 
       - name: Install Conan
-        run: pip install conan ninja
-
-      - name: Set up MSVC dev environment (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        run: pip install conan
 
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
           path: ~/.conan2/p
-          key: conan-${{ runner.os }}-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          key: conan-Linux-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
           restore-keys: |
-            conan-${{ runner.os }}-${{ matrix.build_type }}-
-            conan-${{ runner.os }}-
+            conan-Linux-${{ matrix.build_type }}-
+            conan-Linux-
 
       - name: Detect Conan profile
         run: conan profile detect
 
-      # Windows uses Ninja instead of conan's default Visual Studio generator
-      # so CMAKE_<LANG>_COMPILER_LAUNCHER=sccache below actually takes effect
-      # (the VS generator ignores it). Needs the MSVC dev environment above
-      # for cl.exe/link.exe to be on PATH. Linux keeps its default generator.
       - name: Conan install
-        run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" ${{ runner.os == 'Windows' && '-c tools.cmake.cmaketoolchain:generator=Ninja' || '' }} --build=missing
+        run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
@@ -90,19 +66,88 @@ jobs:
       - name: Test
         run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
 
-      # Reused by package-linux / package-linux-appimage / package-msi below
-      # so they don't have to reconfigure+recompile the same Release build.
+      # Reused by package-linux / package-linux-appimage below so they don't
+      # have to reconfigure+recompile the same Release build.
       - name: Upload build directory (Release)
         if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}-Release
+          name: build-ubuntu-latest-Release
+          path: build/Release
+          retention-days: 1
+
+  build-windows:
+    name: windows-latest / ${{ matrix.build_type }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build_type: Debug
+            preset: conan-debug
+          - build_type: Release
+            preset: conan-release
+
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: pip install conan ninja
+
+      - name: Set up MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-Windows-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          restore-keys: |
+            conan-Windows-${{ matrix.build_type }}-
+            conan-Windows-
+
+      - name: Detect Conan profile
+        run: conan profile detect
+
+      # Ninja instead of conan's default Visual Studio generator, so
+      # CMAKE_<LANG>_COMPILER_LAUNCHER=sccache below actually takes effect
+      # (the VS generator ignores it). Needs the MSVC dev environment above
+      # for cl.exe/link.exe to be on PATH.
+      - name: Conan install
+        run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" -c tools.cmake.cmaketoolchain:generator=Ninja --build=missing
+
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+
+      - name: Build
+        run: cmake --build build/${{ matrix.build_type }}
+
+      - name: Test
+        run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+
+      # Reused by package-msi below so it doesn't have to reconfigure+recompile
+      # the same Release build.
+      - name: Upload build directory (Release)
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-windows-latest-Release
           path: build/Release
           retention-days: 1
 
   package-linux:
     name: Package DEB + RPM (Linux)
-    needs: build
+    needs: build-linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -130,7 +175,7 @@ jobs:
 
   package-linux-appimage:
     name: Package AppImage (Linux)
-    needs: build
+    needs: build-linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -197,7 +242,7 @@ jobs:
 
   package-msi:
     name: Package MSI (Windows)
-    needs: build
+    needs: build-windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -217,9 +262,53 @@ jobs:
           path: build/Release/*.msi
 
   # macOS bundle: disabled, uncomment to re-enable
+  #build-macos:
+  #  name: macos-latest / ${{ matrix.build_type }}
+  #  runs-on: macos-latest
+  #  strategy:
+  #    fail-fast: false
+  #    matrix:
+  #      include:
+  #        - build_type: Debug
+  #          preset: conan-debug
+  #        - build_type: Release
+  #          preset: conan-release
+  #  steps:
+  #    - uses: actions/checkout@v5
+  #
+  #    - uses: actions/setup-python@v5
+  #      with:
+  #        python-version: '3.12'
+  #
+  #    - name: Install Conan
+  #      run: pip install conan
+  #
+  #    - name: Detect Conan profile
+  #      run: conan profile detect
+  #
+  #    - name: Conan install
+  #      run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
+  #
+  #    - name: Configure
+  #      run: cmake --preset ${{ matrix.preset }}
+  #
+  #    - name: Build
+  #      run: cmake --build build/${{ matrix.build_type }}
+  #
+  #    - name: Test
+  #      run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+  #
+  #    - name: Upload build directory (Release)
+  #      if: matrix.build_type == 'Release'
+  #      uses: actions/upload-artifact@v4
+  #      with:
+  #        name: build-macos-latest-Release
+  #        path: build/Release
+  #        retention-days: 1
+  #
   #package-macos-bundle:
   #  name: Package Bundle (macOS)
-  #  needs: build
+  #  needs: build-macos
   #  runs-on: macos-latest
   #  steps:
   #    - uses: actions/checkout@v5
