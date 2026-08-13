@@ -127,7 +127,7 @@ package-linux-appimage:
       cat > SVision3Demo.desktop <<'EOF'
       [Desktop Entry]
       Name=SVision3Demo
-      Exec=twfm
+      Exec=demo
       Icon=svision3demo
       Type=Application
       Categories=Utility;
