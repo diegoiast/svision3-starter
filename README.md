@@ -112,3 +112,11 @@ cmake --build build/Debug
 
 Re-run `conan install` only when `conanfile.py` changes (e.g. after a
 svision3 version bump).
+
+## Helping with developing this template
+
+`main` of the template project always contains a single commit - always. It gets
+squashed "once in a while" from `develop` branch. All code is beeing develped
+there.
+
+All PRs should be done against the `develop` branch.
