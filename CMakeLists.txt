@@ -5,7 +5,21 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(svision3 REQUIRED)
+include(FetchContent)
+
+# Builds svision3 from source instead of consuming it as a prebuilt conan
+# package. Self-contained: fetched into this project's own build tree, no
+# dependency on a sibling checkout existing on disk.
+# TODO: pin GIT_TAG to a real tag/commit instead of a moving branch.
+FetchContent_Declare(svision3
+    GIT_REPOSITORY https://github.com/diegoiast/svision3.git
+    GIT_TAG        main
+)
+
+# We only need the library -- skip svision3's own demos/tests/task_manager.
+set(SVISION3_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
+set(SVISION3_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(svision3)
 
 add_executable(demo src/main.cpp)
 target_link_libraries(demo PRIVATE svision3::svision3)
