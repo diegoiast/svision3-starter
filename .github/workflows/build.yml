@@ -65,7 +65,7 @@ jobs:
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=${{ matrix.build_type }} -s compiler.cppstd=20 --build=missing
+        run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
@@ -110,7 +110,7 @@ jobs:
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Configure
         run: cmake --preset conan-release
@@ -163,7 +163,7 @@ jobs:
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Configure
         run: cmake --preset conan-release
@@ -242,7 +242,7 @@ jobs:
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Configure
         run: cmake --preset conan-release
@@ -276,7 +276,7 @@ jobs:
   #      run: conan profile detect
   #
   #    - name: Conan install
-  #      run: conan install . -s build_type=Release -s compiler.cppstd=20 --build=missing
+  #      run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
   #
   #    - name: Configure
   #      run: cmake --preset conan-release
