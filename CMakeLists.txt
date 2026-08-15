@@ -54,13 +54,29 @@ if(UNIX AND NOT APPLE)
     # differently.
     install(FILES packaging/SVision3Demo.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-    install(FILES packaging/svision3demo.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps)
+    # One size per hicolor bucket -- desktop environments pick whichever
+    # fits the context (taskbar, launcher grid, file manager, etc.) instead
+    # of scaling a single size and losing sharpness.
+    foreach(icon_size 32 64 128 256)
+        install(FILES packaging/svision3demo-${icon_size}.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${icon_size}x${icon_size}/apps
+            RENAME svision3demo.png)
+    endforeach()
 endif()
 
 set(CPACK_PACKAGE_NAME    "SVision3Demo")
 set(CPACK_PACKAGE_VERSION "0.0.1")
 set(CPACK_PACKAGE_VENDOR  "Your Company")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SVision3 starter demo application")
+
+# Shown on its own wizard page (WIX) / in the installer (other generators).
+# CPack's WIX generator wants a recognized extension (.txt or .rtf) to know
+# how to convert it -- the bare LICENSE file doesn't have one, hence the copy.
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/LICENSE.txt")
+
+# Generator-agnostic (WIX and NSIS both understand it): creates a Start Menu
+# shortcut for the given executable, labelled with the second string.
+set(CPACK_PACKAGE_EXECUTABLES "SVision3Demo" "SVision3Demo")
 
 # Strip debug symbols from installed binaries when packaging (DEB/RPM).
 set(CPACK_STRIP_FILES TRUE)
@@ -69,6 +85,31 @@ if(WIN32)
     set(CPACK_GENERATOR "WIX")
     # Regenerate this GUID if you fork or rename the product.
     set(CPACK_WIX_UPGRADE_GUID "E8A52B7C-3F4D-4A1E-9B6C-D2F8E3A1C057")
+    # Shown in Add/Remove Programs and used for the Start Menu shortcut
+    # created by CPACK_PACKAGE_EXECUTABLES above. WIX specifically wants a
+    # .ico file -- CPACK_PACKAGE_ICON (used by NSIS) doesn't apply here.
+    set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/packaging/svision3demo.ico")
+
+    # Add/Remove Programs metadata.
+    set(CPACK_WIX_PROPERTY_ARPCOMMENTS     "${CPACK_PACKAGE_DESCRIPTION_SUMMARY}")
+    set(CPACK_WIX_PROPERTY_ARPHELPLINK     "https://github.com/diegoiast/svision3-starter")
+    set(CPACK_WIX_PROPERTY_ARPURLINFOABOUT "https://github.com/diegoiast/svision3-starter")
+
+    # Banner shown at the top of most wizard pages (493x58) and the
+    # full-page background used on the welcome/finish pages (493x312).
+    set(CPACK_WIX_UI_BANNER "${CMAKE_CURRENT_SOURCE_DIR}/packaging/wix-banner.bmp")
+    set(CPACK_WIX_UI_DIALOG "${CMAKE_CURRENT_SOURCE_DIR}/packaging/wix-dialog.bmp")
+
+    # UNVERIFIED: no Windows/WiX toolchain available to test this against
+    # (this project builds WIX packages only in CI). Overrides the
+    # welcome/finish page wording via a localization file passed straight to
+    # light.exe -- see packaging/wix-en-us.wxl for why a simple CPACK_WIX_*
+    # variable can't do this. If the string Ids in that file don't match
+    # what the installed WiX version expects, this silently has no effect
+    # (the stock wording still shows) rather than breaking the build --
+    # check the actual installer output in Windows CI and adjust the Ids in
+    # wix-en-us.wxl if needed.
+    set(CPACK_WIX_LIGHT_EXTRA_FLAGS "-loc" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/wix-en-us.wxl")
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
     set(CPACK_DMG_VOLUME_NAME "SVision3Demo")

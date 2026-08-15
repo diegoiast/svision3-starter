@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Overrides WiX's built-in wizard page wording (welcome/finish pages), which
+  isn't exposed through a simple CPACK_WIX_* variable -- CPack doesn't
+  generate those dialogs itself, they come from the stock WixUI_InstallDir
+  dialog set, so the only way to change their text is a localization
+  override like this one, passed to light.exe via CPACK_WIX_LIGHT_EXTRA_FLAGS
+  (-loc). Edit the strings below to whatever wording you want; [ProductName]
+  and [Manufacturer] are WiX's standard placeholders (CPACK_PACKAGE_NAME /
+  CPACK_PACKAGE_VENDOR).
+-->
+<WixLocalization Culture="en-us" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="WelcomeDlgTitle">Welcome to [ProductName]</String>
+  <String Id="WelcomeDlgDescription">This wizard will guide you through installing [ProductName] on your computer.</String>
+  <String Id="ExitDialogTitle">[ProductName] installation complete</String>
+  <String Id="ExitDialogDescription">Thank you for installing [ProductName]. Click Finish to exit.</String>
+</WixLocalization>
