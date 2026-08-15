@@ -82,7 +82,7 @@ jobs:
       # this alongside UPDATES_DISCONNECTED above as belt-and-suspenders,
       # in case something ever still needs a working .git in that tree.
       - name: Upload build directory (Release)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-ubuntu-latest-Release
           path: build/Release
@@ -162,7 +162,7 @@ jobs:
       # caused "fatal: not a git repository" downstream on Linux. Keeping
       # this alongside UPDATES_DISCONNECTED above as belt-and-suspenders.
       - name: Upload build directory (Release)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-windows-latest-Release
           path: build/Release
@@ -194,7 +194,7 @@ jobs:
           sudo apt-get install -y dpkg-dev rpm
 
       - name: Download build directory (Release)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: build-ubuntu-latest-Release
           path: build/Release
@@ -236,7 +236,7 @@ jobs:
 
       - name: Upload CPack logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cpack-logs-linux-deb
           path: build/Release/_CPack_Packages/**/*.log
@@ -249,7 +249,7 @@ jobs:
           for f in *.deb; do mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.deb"; done
           for f in *.rpm; do mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.rpm"; done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: SVision3Demo${{ steps.version.outputs.suffix }}-linux
           path: |
@@ -283,7 +283,7 @@ jobs:
             libfuse2
 
       - name: Download build directory (Release)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: build-ubuntu-latest-Release
           path: build/Release
@@ -339,7 +339,7 @@ jobs:
             mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.AppImage"
           done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: SVision3Demo${{ steps.version.outputs.suffix }}-appimage
           path: |
@@ -376,7 +376,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Download build directory (Release)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: build-windows-latest-Release
           path: build/Release
@@ -409,7 +409,7 @@ jobs:
 
       - name: Upload CPack logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cpack-logs-windows
           path: build/Release/_CPack_Packages/**/*.log
@@ -421,7 +421,7 @@ jobs:
           cd build/Release
           for f in *.msi; do mv -- "$f" "SVision3Demo${{ steps.version.outputs.suffix }}.msi"; done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: SVision3Demo${{ steps.version.outputs.suffix }}-windows
           path: build/Release/*.msi
@@ -456,7 +456,7 @@ jobs:
   #      run: ctest --test-dir build/Release -C Release --output-on-failure
   #
   #    - name: Upload build directory (Release)
-  #      uses: actions/upload-artifact@v4
+  #      uses: actions/upload-artifact@v7
   #      with:
   #        name: build-macos-latest-Release
   #        path: build/Release
@@ -470,7 +470,7 @@ jobs:
   #    - uses: actions/checkout@v5
   #
   #    - name: Download build directory (Release)
-  #      uses: actions/download-artifact@v4
+  #      uses: actions/download-artifact@v7
   #      with:
   #        name: build-macos-latest-Release
   #        path: build/Release
@@ -478,7 +478,7 @@ jobs:
   #    - name: Package DMG
   #      run: cd build/Release && cpack -C Release
   #
-  #    - uses: actions/upload-artifact@v4
+  #    - uses: actions/upload-artifact@v7
   #      with:
   #        name: SVision3Demo-macos
   #        path: build/Release/*.dmg
