@@ -299,10 +299,13 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: SVision3Demo${{ steps.version.outputs.suffix }}-linux
-          path: |
-            build/Release/*.deb
-            build/Release/*.rpm
+          name: SVision3Demo${{ steps.version.outputs.suffix }}(deb)
+          path: build/Release/*.deb
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SVision3Demo${{ steps.version.outputs.suffix }}(rpm)
+          path: build/Release/*.rpm
 
   package-linux-appimage:
     name: Package AppImage (Linux)
