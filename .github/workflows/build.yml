@@ -9,7 +9,7 @@ on:
 jobs:
   build-linux:
     name: ubuntu-latest / Release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -91,7 +91,7 @@ jobs:
 
   build-windows:
     name: windows-latest / Release
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -172,7 +172,7 @@ jobs:
   package-linux:
     name: Package DEB + RPM (Linux)
     needs: build-linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: "true"
     steps:
@@ -230,9 +230,16 @@ jobs:
       # original relative ordering of source-vs-build-output timestamps.
       # Normalizing everything to one fixed mtime makes every "is X newer
       # than Y" check false, so no reconfigure gets triggered at all.
+      # IMPORTANT: this must also cover ~/.conan2 (restored by the "Cache
+      # Conan packages" step above) -- it's outside the repo checkout, so a
+      # plain `find .` misses it, leaving those files at "now" and strictly
+      # newer than everything else we just normalized. That mismatch is what
+      # was actually triggering the reconfigure this whole time.
       - name: Normalize timestamps
         shell: bash
-        run: find . -exec touch -t 202001010000 {} + 2>/dev/null || true
+        run: |
+          find . -exec touch -t 202001010000 {} + 2>/dev/null || true
+          find ~/.conan2 -exec touch -t 202001010000 {} + 2>/dev/null || true
 
       # cpack's DEB/RPM generators run a "preinstall" build pass first to make
       # sure everything's up to date. If a reconfigure does get triggered
@@ -283,7 +290,7 @@ jobs:
   package-linux-appimage:
     name: Package AppImage (Linux)
     needs: build-linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -373,7 +380,7 @@ jobs:
   package-msi:
     name: Package MSI (Windows)
     needs: build-windows
-    runs-on: windows-latest
+    runs-on: windows-2022
     env:
       SCCACHE_GHA_ENABLED: "true"
     steps:
@@ -419,9 +426,12 @@ jobs:
 
       # See "Normalize timestamps" comment in package-linux -- stops
       # cmake_check_build_system from spuriously deciding to reconfigure.
+      # Must also cover ~/.conan2 (restored above), not just the checkout.
       - name: Normalize timestamps
         shell: bash
-        run: find . -exec touch -t 202001010000 {} + 2>/dev/null || true
+        run: |
+          find . -exec touch -t 202001010000 {} + 2>/dev/null || true
+          find ~/.conan2 -exec touch -t 202001010000 {} + 2>/dev/null || true
 
       # cpack's preinstall build pass (see comment in package-linux) needs
       # cl.exe, ninja, and sccache all present -- none of which this job
