@@ -16,6 +16,7 @@ int main(int argc, char *argv[]) {
 
     layout->add_widget(std::make_unique<Label>("Hello friends!"));
     window->set_root(std::move(layout));
+    window->show();
 
     return app.run();
 }
