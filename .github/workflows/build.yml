@@ -416,7 +416,7 @@ jobs:
             echo "suffix=-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
