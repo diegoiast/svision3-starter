@@ -29,7 +29,17 @@ set_target_properties(SVision3Demo PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME          "SVision3Demo"
     MACOSX_BUNDLE_BUNDLE_VERSION       "0.0.1"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "0.0.1"
+    # Without this, MSVC links with /SUBSYSTEM:CONSOLE by default, which
+    # pops up a console window alongside the actual GUI window.
+    WIN32_EXECUTABLE TRUE
 )
+if(WIN32)
+    # WIN32_EXECUTABLE above switches to /SUBSYSTEM:WINDOWS, which expects a
+    # WinMain entry point -- main.cpp uses a plain int main(), so the linker
+    # needs to be told explicitly to still start from the C runtime's normal
+    # entry point instead.
+    set_target_properties(SVision3Demo PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup")
+endif()
 
 find_package(Catch2 REQUIRED)
 include(CTest)
