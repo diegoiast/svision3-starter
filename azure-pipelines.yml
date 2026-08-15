@@ -13,17 +13,17 @@ stages:
       - job: build
         strategy:
           matrix:
-            Linux_Release:
-              imageName: ubuntu-latest
+            Ubuntu2404_Release:
+              imageName: ubuntu-24.04
               buildType: Release
               preset: conan-release
-            Windows_Release:
-              imageName: windows-latest
+            Windows2022_Release:
+              imageName: windows-2022
               buildType: Release
               preset: conan-release
             # macOS: disabled, uncomment to re-enable
-            #macOS_Release:
-            #  imageName: macos-latest
+            #macOS15_Release:
+            #  imageName: macOS-15
             #  buildType: Release
             #  preset: conan-release
         pool:
@@ -65,9 +65,9 @@ stages:
     condition: succeeded()
     jobs:
       - job: package_linux
-        displayName: DEB + RPM (Linux)
+        displayName: DEB + RPM (Ubuntu 24.04)
         pool:
-          vmImage: ubuntu-latest
+          vmImage: ubuntu-24.04
         steps:
           - script: |
               sudo apt-get update
@@ -113,9 +113,9 @@ stages:
               artifact: SVision3Demo-linux
 
       - job: package_appimage
-        displayName: AppImage (Linux)
+        displayName: AppImage (Ubuntu 24.04)
         pool:
-          vmImage: ubuntu-latest
+          vmImage: ubuntu-24.04
         steps:
           - script: |
               sudo apt-get update
@@ -195,9 +195,9 @@ stages:
               artifact: SVision3Demo-appimage
 
       - job: package_msi
-        displayName: MSI (Windows)
+        displayName: MSI (Windows 2022)
         pool:
-          vmImage: windows-latest
+          vmImage: windows-2022
         steps:
           - task: UsePythonVersion@0
             inputs:
@@ -234,9 +234,9 @@ stages:
 
       # macOS bundle: disabled, uncomment to re-enable
       #- job: package_macos
-      #  displayName: Bundle (macOS)
+      #  displayName: Bundle (macOS 15)
       #  pool:
-      #    vmImage: macos-latest
+      #    vmImage: macOS-15
       #  steps:
       #    - task: UsePythonVersion@0
       #      inputs:

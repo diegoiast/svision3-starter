@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-linux:
-    name: ubuntu-latest / Release
+    name: ubuntu-24.04 / Release
     runs-on: ubuntu-24.04
 
     env:
@@ -84,13 +84,13 @@ jobs:
       - name: Upload build directory (Release)
         uses: actions/upload-artifact@v7
         with:
-          name: build-ubuntu-latest-Release
+          name: build-ubuntu-24.04-Release
           path: build/Release
           include-hidden-files: true
           retention-days: 1
 
   build-windows:
-    name: windows-latest / Release
+    name: windows-2022 / Release
     runs-on: windows-2022
 
     env:
@@ -164,7 +164,7 @@ jobs:
       - name: Upload build directory (Release)
         uses: actions/upload-artifact@v7
         with:
-          name: build-windows-latest-Release
+          name: build-windows-2022-Release
           path: build/Release
           include-hidden-files: true
           retention-days: 1
@@ -220,7 +220,7 @@ jobs:
       - name: Download build directory (Release)
         uses: actions/download-artifact@v7
         with:
-          name: build-ubuntu-latest-Release
+          name: build-ubuntu-24.04-Release
           path: build/Release
 
       # cmake_check_build_system runs on every `cmake --build`/preinstall
@@ -316,7 +316,7 @@ jobs:
       - name: Download build directory (Release)
         uses: actions/download-artifact@v7
         with:
-          name: build-ubuntu-latest-Release
+          name: build-ubuntu-24.04-Release
           path: build/Release
 
       # Unlike cpack (see package-linux), cmake --install only runs the
@@ -421,7 +421,7 @@ jobs:
       - name: Download build directory (Release)
         uses: actions/download-artifact@v7
         with:
-          name: build-windows-latest-Release
+          name: build-windows-2022-Release
           path: build/Release
 
       # See "Normalize timestamps" comment in package-linux -- stops
@@ -474,8 +474,8 @@ jobs:
 
   # macOS bundle: disabled, uncomment to re-enable
   #build-macos:
-  #  name: macos-latest / Release
-  #  runs-on: macos-latest
+  #  name: macos-15 / Release
+  #  runs-on: macos-15
   #  steps:
   #    - uses: actions/checkout@v5
   #
@@ -504,21 +504,21 @@ jobs:
   #    - name: Upload build directory (Release)
   #      uses: actions/upload-artifact@v7
   #      with:
-  #        name: build-macos-latest-Release
+  #        name: build-macos-15-Release
   #        path: build/Release
   #        retention-days: 1
   #
   #package-macos-bundle:
   #  name: Package Bundle (macOS)
   #  needs: build-macos
-  #  runs-on: macos-latest
+  #  runs-on: macos-15
   #  steps:
   #    - uses: actions/checkout@v5
   #
   #    - name: Download build directory (Release)
   #      uses: actions/download-artifact@v7
   #      with:
-  #        name: build-macos-latest-Release
+  #        name: build-macos-15-Release
   #        path: build/Release
   #
   #    - name: Package DMG

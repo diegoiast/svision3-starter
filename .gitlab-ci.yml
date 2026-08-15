@@ -2,7 +2,7 @@ stages:
   - build
   - package
 
-.linux-build:
+.ubuntu2404-build:
   stage: build
   image: ubuntu:24.04
   before_script:
@@ -20,7 +20,7 @@ stages:
     - ctest --test-dir build/$BUILD_TYPE -C $BUILD_TYPE --output-on-failure
 
 # macOS: disabled, uncomment to re-enable
-#.macos-build:
+#.macos15-build:
 #  stage: build
 #  tags:
 #    - macos
@@ -33,7 +33,7 @@ stages:
 #    - cmake --build build/$BUILD_TYPE
 #    - ctest --test-dir build/$BUILD_TYPE -C $BUILD_TYPE --output-on-failure
 
-.windows-build:
+.windows2022-build:
   stage: build
   tags:
     - windows
@@ -46,27 +46,27 @@ stages:
     - cmake --build build/$BUILD_TYPE
     - ctest --test-dir build/$BUILD_TYPE -C $BUILD_TYPE --output-on-failure
 
-linux-release:
-  extends: .linux-build
+ubuntu-24.04-release:
+  extends: .ubuntu2404-build
   variables:
     BUILD_TYPE: Release
     CMAKE_PRESET: conan-release
 
-windows-release:
-  extends: .windows-build
+windows-2022-release:
+  extends: .windows2022-build
   variables:
     BUILD_TYPE: Release
     CMAKE_PRESET: conan-release
 
-#macos-release:
-#  extends: .macos-build
+#macos-15-release:
+#  extends: .macos15-build
 #  variables:
 #    BUILD_TYPE: Release
 #    CMAKE_PRESET: conan-release
 
 # --- Packaging jobs ---
 
-package-linux:
+package-linux-ubuntu-24.04:
   stage: package
   image: ubuntu:24.04
   before_script:
@@ -87,7 +87,7 @@ package-linux:
       - build/Release/*.deb
       - build/Release/*.rpm
 
-package-linux-appimage:
+package-appimage-ubuntu-24.04:
   stage: package
   image: ubuntu:24.04
   before_script:
@@ -138,7 +138,7 @@ package-linux-appimage:
     paths:
       - "*.AppImage"
 
-package-msi:
+package-msi-windows-2022:
   stage: package
   tags:
     - windows
@@ -155,7 +155,7 @@ package-msi:
       - build/Release/*.msi
 
 # macOS bundle: disabled, uncomment to re-enable
-#package-macos-bundle:
+#package-macos-bundle-macos-15:
 #  stage: package
 #  tags:
 #    - macos
