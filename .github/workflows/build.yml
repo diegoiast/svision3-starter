@@ -327,7 +327,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 \
+          sudo apt-get install -y \
             libgl-dev libx11-dev libxext-dev \
             libwayland-dev libegl1-mesa-dev libxkbcommon-dev libdbus-1-dev \
             libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev zlib1g-dev pkg-config \
@@ -350,36 +350,15 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
 
-      - name: Create .desktop file and icon
-        run: |
-          cat > SVision3Demo.desktop <<'EOF'
-          [Desktop Entry]
-          Name=SVision3Demo
-          Exec=SVision3Demo
-          Icon=svision3demo
-          Type=Application
-          Categories=Utility;
-          EOF
-          python3 -c "
-          import struct, zlib
-          w,h=64,64
-          raw=b''.join(b'\x00'+bytes([0,120,212]*w) for _ in range(h))
-          def mk(t,d):
-              c=struct.pack('>I',len(d))+t+d
-              return c+struct.pack('>I',zlib.crc32(c[4:])&0xffffffff)
-          data=(b'\x89PNG\r\n\x1a\n'
-              +mk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,2,0,0,0))
-              +mk(b'IDAT',zlib.compress(raw))
-              +mk(b'IEND',b''))
-          open('svision3demo.png','wb').write(data)
-          "
-
+      # Desktop file + icon now come from packaging/ (committed, also used
+      # by the deb/rpm install rules in CMakeLists.txt) instead of being
+      # generated inline here.
       - name: Build AppImage
         run: |
           ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
             --appdir AppDir \
-            -d SVision3Demo.desktop \
-            -i svision3demo.png \
+            -d packaging/SVision3Demo.desktop \
+            -i packaging/svision3demo.png \
             --output appimage
 
       - name: Rename AppImage

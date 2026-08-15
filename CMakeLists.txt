@@ -44,9 +44,26 @@ install(TARGETS SVision3Demo
     RUNTIME DESTINATION bin
 )
 
+if(UNIX AND NOT APPLE)
+    include(GNUInstallDirs)
+    # Desktop menu entry + icon, matching what the AppImage packaging job
+    # already generates inline -- deb/rpm need these too to show up in an
+    # application launcher; cpack doesn't add them on its own. Not gated to
+    # any specific CPack generator, so both DEB and RPM package this the
+    # same way -- they share the same install() manifest, just archived
+    # differently.
+    install(FILES packaging/SVision3Demo.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/svision3demo.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps)
+endif()
+
 set(CPACK_PACKAGE_NAME    "SVision3Demo")
 set(CPACK_PACKAGE_VERSION "0.0.1")
 set(CPACK_PACKAGE_VENDOR  "Your Company")
+
+# Strip debug symbols from installed binaries when packaging (DEB/RPM).
+set(CPACK_STRIP_FILES TRUE)
 
 if(WIN32)
     set(CPACK_GENERATOR "WIX")
