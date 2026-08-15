@@ -110,7 +110,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Cache Conan packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.conan2/p
           key: conan-Windows-Release-${{ hashFiles('conanfile.py') }}
@@ -188,10 +188,18 @@ jobs:
             echo "suffix=-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Same full list build-linux installs, plus dpkg-dev/rpm for packaging.
+      # If cmake_check_build_system (below) decides to reconfigure, svision3's
+      # CMakeLists.txt re-runs its pkg_check_modules() calls (cairo, harfbuzz,
+      # freetype, wayland, etc.) same as it did during the original configure
+      # -- this job needs every system package that configure needed, not
+      # just the packaging tools.
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev rpm
+          sudo apt-get install -y dpkg-dev rpm libgl-dev libx11-dev libxext-dev \
+            libwayland-dev libwayland-bin wayland-protocols libegl1-mesa-dev libxkbcommon-dev libdbus-1-dev \
+            libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev zlib1g-dev pkg-config
 
       # We don't run `conan install` here, but if cmake_check_build_system
       # (below) decides to reconfigure anyway, svision3's own CMakeLists.txt
@@ -396,7 +404,7 @@ jobs:
       # actual conan package binaries on disk, not just the *-config.cmake
       # files already in the downloaded build tree.
       - name: Cache Conan packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.conan2/p
           key: conan-Windows-Release-${{ hashFiles('conanfile.py') }}
