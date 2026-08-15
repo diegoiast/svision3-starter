@@ -158,7 +158,7 @@ stages:
               ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run
               --appdir AppDir
               -d packaging/SVision3Demo.desktop
-              -i packaging/svision3demo.png
+              -i packaging/svision3demo-256.png
               --output appimage
             displayName: Build AppImage
 
