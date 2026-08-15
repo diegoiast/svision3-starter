@@ -72,6 +72,17 @@ jobs:
       - name: Test
         run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
 
+      # actions/cache is capped at 10GB per repo (shared across every cache
+      # key we have: Linux/Windows x Debug/Release x sccache's own GHA cache),
+      # with LRU eviction once that's exceeded. ~/.conan2/p holds source and
+      # build scratch dirs for every dependency, not just the final package
+      # binaries we actually need to skip a rebuild -- trimming that before
+      # the cache saves (which happens automatically as a post-step at job
+      # end) keeps our footprint down so it's less likely to get evicted.
+      - name: Trim Conan cache before saving
+        shell: bash
+        run: conan cache clean "*" --source --build --download
+
       # Reused by package-linux / package-linux-appimage below so they don't
       # have to reconfigure+recompile the same Release build.
       # include-hidden-files: actions/upload-artifact excludes dotfiles by
@@ -157,6 +168,12 @@ jobs:
       - name: Test
         run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
 
+      # See "Trim Conan cache before saving" comment in build-linux -- same
+      # 10GB-repo-cap/eviction concern applies here.
+      - name: Trim Conan cache before saving
+        shell: bash
+        run: conan cache clean "*" --source --build --download
+
       # Reused by package-msi below so it doesn't have to reconfigure+recompile
       # the same Release build.
       # include-hidden-files: actions/upload-artifact excludes dotfiles by
@@ -202,13 +219,24 @@ jobs:
           name: build-ubuntu-latest-Release
           path: build/Release
 
+      # cmake_check_build_system runs on every `cmake --build`/preinstall
+      # invocation and reconfigures from scratch if it thinks anything looks
+      # newer than the generated build system -- easy to trigger spuriously
+      # after an artifact download, since extraction doesn't preserve the
+      # original relative ordering of source-vs-build-output timestamps.
+      # Normalizing everything to one fixed mtime makes every "is X newer
+      # than Y" check false, so no reconfigure gets triggered at all.
+      - name: Normalize timestamps
+        shell: bash
+        run: find . -exec touch -t 202001010000 {} + 2>/dev/null || true
+
       # cpack's DEB/RPM generators run a "preinstall" build pass first to make
-      # sure everything's up to date. If the downloaded tree looks stale (easy
-      # after an artifact re-extract) it recompiles using the sccache launcher
-      # already baked into the Makefiles from build-linux's configure -- so
-      # sccache needs to be present here too, even though this job doesn't
-      # configure/build anything itself. Runs after build-linux, so this is a
-      # cache hit rather than a real rebuild.
+      # sure everything's up to date. If a reconfigure does get triggered
+      # anyway, it recompiles using the sccache launcher already baked into
+      # the Makefiles from build-linux's configure -- so sccache needs to be
+      # present here too, even though this job doesn't configure/build
+      # anything itself. Runs after build-linux, so this is a cache hit
+      # rather than a real rebuild.
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
 
@@ -372,6 +400,12 @@ jobs:
         with:
           name: build-windows-latest-Release
           path: build/Release
+
+      # See "Normalize timestamps" comment in package-linux -- stops
+      # cmake_check_build_system from spuriously deciding to reconfigure.
+      - name: Normalize timestamps
+        shell: bash
+        run: find . -exec touch -t 202001010000 {} + 2>/dev/null || true
 
       # cpack's preinstall build pass (see comment in package-linux) needs
       # cl.exe, ninja, and sccache all present -- none of which this job
