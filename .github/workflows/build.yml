@@ -8,16 +8,8 @@ on:
 
 jobs:
   build-linux:
-    name: ubuntu-latest / ${{ matrix.build_type }}
+    name: ubuntu-latest / Release
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - build_type: Debug
-            preset: conan-debug
-          - build_type: Release
-            preset: conan-release
 
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -32,7 +24,7 @@ jobs:
             libwayland-dev libwayland-bin wayland-protocols libegl1-mesa-dev libxkbcommon-dev libdbus-1-dev \
             libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev zlib1g-dev pkg-config
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -40,19 +32,18 @@ jobs:
         run: pip install conan
 
       - name: Cache Conan packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.conan2/p
-          key: conan-Linux-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          key: conan-Linux-Release-${{ hashFiles('conanfile.py') }}
           restore-keys: |
-            conan-Linux-${{ matrix.build_type }}-
-            conan-Linux-
+            conan-Linux-Release-
 
       - name: Detect Conan profile
         run: conan profile detect
 
       - name: Conan install
-        run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
@@ -64,18 +55,18 @@ jobs:
       # Without it, that recheck needs `.git` to still be a valid repo --
       # fragile once the tree round-trips through an artifact upload/download.
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+        run: cmake --preset conan-release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
       - name: Build
-        run: cmake --build build/${{ matrix.build_type }}
+        run: cmake --build build/Release
 
       - name: Test
-        run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+        run: ctest --test-dir build/Release -C Release --output-on-failure
 
       # actions/cache is capped at 10GB per repo (shared across every cache
-      # key we have: Linux/Windows x Debug/Release x sccache's own GHA cache),
-      # with LRU eviction once that's exceeded. ~/.conan2/p holds source and
-      # build scratch dirs for every dependency, not just the final package
+      # key we have: Linux/Windows x sccache's own GHA cache), with LRU
+      # eviction once that's exceeded. ~/.conan2/p holds source and build
+      # scratch dirs for every dependency, not just the final package
       # binaries we actually need to skip a rebuild -- trimming that before
       # the cache saves (which happens automatically as a post-step at job
       # end) keeps our footprint down so it's less likely to get evicted.
@@ -91,7 +82,6 @@ jobs:
       # this alongside UPDATES_DISCONNECTED above as belt-and-suspenders,
       # in case something ever still needs a working .git in that tree.
       - name: Upload build directory (Release)
-        if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
           name: build-ubuntu-latest-Release
@@ -100,16 +90,8 @@ jobs:
           retention-days: 1
 
   build-windows:
-    name: windows-latest / ${{ matrix.build_type }}
+    name: windows-latest / Release
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - build_type: Debug
-            preset: conan-debug
-          - build_type: Release
-            preset: conan-release
 
     env:
       SCCACHE_GHA_ENABLED: "true"
@@ -131,10 +113,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.conan2/p
-          key: conan-Windows-${{ matrix.build_type }}-${{ hashFiles('conanfile.py') }}
+          key: conan-Windows-Release-${{ hashFiles('conanfile.py') }}
           restore-keys: |
-            conan-Windows-${{ matrix.build_type }}-
-            conan-Windows-
+            conan-Windows-Release-
 
       - name: Detect Conan profile
         run: conan profile detect
@@ -144,7 +125,7 @@ jobs:
       # (the VS generator ignores it). Needs the MSVC dev environment above
       # for cl.exe/link.exe to be on PATH.
       - name: Conan install
-        run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" -c tools.cmake.cmaketoolchain:generator=Ninja --build=missing
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" -c tools.cmake.cmaketoolchain:generator=Ninja --build=missing
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.11
@@ -160,13 +141,13 @@ jobs:
       # cmake_check_build_system pass that runs on every `cmake --build`,
       # including cpack's preinstall step in package-msi downstream).
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+        run: cmake --preset conan-release -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
       - name: Build
-        run: cmake --build build/${{ matrix.build_type }}
+        run: cmake --build build/Release
 
       - name: Test
-        run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+        run: ctest --test-dir build/Release -C Release --output-on-failure
 
       # See "Trim Conan cache before saving" comment in build-linux -- same
       # 10GB-repo-cap/eviction concern applies here.
@@ -181,7 +162,6 @@ jobs:
       # caused "fatal: not a git repository" downstream on Linux. Keeping
       # this alongside UPDATES_DISCONNECTED above as belt-and-suspenders.
       - name: Upload build directory (Release)
-        if: matrix.build_type == 'Release'
         uses: actions/upload-artifact@v4
         with:
           name: build-windows-latest-Release
@@ -324,7 +304,7 @@ jobs:
           cat > SVision3Demo.desktop <<'EOF'
           [Desktop Entry]
           Name=SVision3Demo
-          Exec=demo
+          Exec=SVision3Demo
           Icon=svision3demo
           Type=Application
           Categories=Utility;
@@ -448,16 +428,8 @@ jobs:
 
   # macOS bundle: disabled, uncomment to re-enable
   #build-macos:
-  #  name: macos-latest / ${{ matrix.build_type }}
+  #  name: macos-latest / Release
   #  runs-on: macos-latest
-  #  strategy:
-  #    fail-fast: false
-  #    matrix:
-  #      include:
-  #        - build_type: Debug
-  #          preset: conan-debug
-  #        - build_type: Release
-  #          preset: conan-release
   #  steps:
   #    - uses: actions/checkout@v5
   #
@@ -472,19 +444,18 @@ jobs:
   #      run: conan profile detect
   #
   #    - name: Conan install
-  #      run: conan install . -s build_type=${{ matrix.build_type }} -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
+  #      run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
   #
   #    - name: Configure
-  #      run: cmake --preset ${{ matrix.preset }}
+  #      run: cmake --preset conan-release
   #
   #    - name: Build
-  #      run: cmake --build build/${{ matrix.build_type }}
+  #      run: cmake --build build/Release
   #
   #    - name: Test
-  #      run: ctest --test-dir build/${{ matrix.build_type }} -C ${{ matrix.build_type }} --output-on-failure
+  #      run: ctest --test-dir build/Release -C Release --output-on-failure
   #
   #    - name: Upload build directory (Release)
-  #      if: matrix.build_type == 'Release'
   #      uses: actions/upload-artifact@v4
   #      with:
   #        name: build-macos-latest-Release

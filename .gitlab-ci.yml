@@ -46,23 +46,11 @@ stages:
     - cmake --build build/$BUILD_TYPE
     - ctest --test-dir build/$BUILD_TYPE -C $BUILD_TYPE --output-on-failure
 
-linux-debug:
-  extends: .linux-build
-  variables:
-    BUILD_TYPE: Debug
-    CMAKE_PRESET: conan-debug
-
 linux-release:
   extends: .linux-build
   variables:
     BUILD_TYPE: Release
     CMAKE_PRESET: conan-release
-
-windows-debug:
-  extends: .windows-build
-  variables:
-    BUILD_TYPE: Debug
-    CMAKE_PRESET: conan-debug
 
 windows-release:
   extends: .windows-build
@@ -70,12 +58,6 @@ windows-release:
     BUILD_TYPE: Release
     CMAKE_PRESET: conan-release
 
-#macos-debug:
-#  extends: .macos-build
-#  variables:
-#    BUILD_TYPE: Debug
-#    CMAKE_PRESET: conan-debug
-#
 #macos-release:
 #  extends: .macos-build
 #  variables:
@@ -127,7 +109,7 @@ package-linux-appimage:
       cat > SVision3Demo.desktop <<'EOF'
       [Desktop Entry]
       Name=SVision3Demo
-      Exec=demo
+      Exec=SVision3Demo
       Icon=svision3demo
       Type=Application
       Categories=Utility;

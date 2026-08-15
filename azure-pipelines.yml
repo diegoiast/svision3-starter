@@ -13,27 +13,15 @@ stages:
       - job: build
         strategy:
           matrix:
-            Linux_Debug:
-              imageName: ubuntu-latest
-              buildType: Debug
-              preset: conan-debug
             Linux_Release:
               imageName: ubuntu-latest
               buildType: Release
               preset: conan-release
-            Windows_Debug:
-              imageName: windows-latest
-              buildType: Debug
-              preset: conan-debug
             Windows_Release:
               imageName: windows-latest
               buildType: Release
               preset: conan-release
             # macOS: disabled, uncomment to re-enable
-            #macOS_Debug:
-            #  imageName: macos-latest
-            #  buildType: Debug
-            #  preset: conan-debug
             #macOS_Release:
             #  imageName: macos-latest
             #  buildType: Release
@@ -168,7 +156,7 @@ stages:
               cat > SVision3Demo.desktop <<'EOF'
               [Desktop Entry]
               Name=SVision3Demo
-              Exec=demo
+              Exec=SVision3Demo
               Icon=svision3demo
               Type=Application
               Categories=Utility;

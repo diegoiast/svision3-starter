@@ -21,10 +21,10 @@ set(SVISION3_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
 set(SVISION3_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(svision3)
 
-add_executable(demo src/main.cpp)
-target_link_libraries(demo PRIVATE svision3::svision3)
+add_executable(SVision3Demo src/main.cpp)
+target_link_libraries(SVision3Demo PRIVATE svision3::svision3)
 
-set_target_properties(demo PROPERTIES
+set_target_properties(SVision3Demo PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME          "SVision3Demo"
     MACOSX_BUNDLE_BUNDLE_VERSION       "0.0.1"
@@ -39,7 +39,7 @@ add_executable(unit_tests tests/test_example.cpp)
 target_link_libraries(unit_tests PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(unit_tests)
 
-install(TARGETS demo
+install(TARGETS SVision3Demo
     BUNDLE  DESTINATION .
     RUNTIME DESTINATION bin
 )
