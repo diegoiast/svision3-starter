@@ -201,14 +201,15 @@ jobs:
             libwayland-dev libwayland-bin wayland-protocols libegl1-mesa-dev libxkbcommon-dev libdbus-1-dev \
             libcairo2-dev libfontconfig1-dev libharfbuzz-dev libfreetype-dev libssl-dev zlib1g-dev pkg-config
 
-      # We don't run `conan install` here, but if cmake_check_build_system
-      # (below) decides to reconfigure anyway, svision3's own CMakeLists.txt
-      # re-runs find_package(spdlog) etc. -- which needs the actual conan
-      # package binaries on disk, not just the generated *-config.cmake files
-      # already inside the downloaded build tree. Restoring the same cache
-      # build-linux populated (read-only in practice, since it already saved
-      # under this exact key) makes any such reconfigure succeed instead of
-      # failing with "Library 'spdlog' not found in package".
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: pip install conan
+
+      # Restoring the same cache build-linux populated so this install is a
+      # fast cache hit, not a real rebuild.
       - name: Cache Conan packages
         uses: actions/cache@v5
         with:
@@ -216,6 +217,22 @@ jobs:
           key: conan-Linux-Release-${{ hashFiles('conanfile.py') }}
           restore-keys: |
             conan-Linux-Release-
+
+      - name: Detect Conan profile
+        run: conan profile detect
+
+      # cmake_check_build_system (below) reconfigures on every `cmake --build`
+      # invocation, including cpack's preinstall pass -- when it does,
+      # svision3's CMakeLists.txt re-runs find_package(spdlog) etc. against
+      # whatever's actually resolvable right now. Relying on a *restored*
+      # cache to already exactly match what build-linux's own conan install
+      # produced turned out not to be reliable (some restored packages were
+      # missing specific library files, e.g. Catch2Main, for reasons that
+      # didn't reproduce locally) -- running the exact same `conan install`
+      # here guarantees a fully consistent, correctly resolved environment
+      # instead of hoping a partial cache restore lines up.
+      - name: Conan install
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" --build=missing
 
       - name: Download build directory (Release)
         uses: actions/download-artifact@v7
@@ -400,16 +417,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Ninja
-        run: pip install ninja
+      - name: Install Conan and Ninja
+        run: pip install conan ninja
 
       - name: Set up MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      # See the matching comment in package-linux: if cmake_check_build_system
-      # decides to reconfigure during cpack's preinstall pass, it needs the
-      # actual conan package binaries on disk, not just the *-config.cmake
-      # files already in the downloaded build tree.
+      # Restoring the same cache build-windows populated so this install is a
+      # fast cache hit, not a real rebuild.
       - name: Cache Conan packages
         uses: actions/cache@v6
         with:
@@ -417,6 +432,17 @@ jobs:
           key: conan-Windows-Release-${{ hashFiles('conanfile.py') }}
           restore-keys: |
             conan-Windows-Release-
+
+      - name: Detect Conan profile
+        run: conan profile detect
+
+      # See the matching comment in package-linux: relying on a *restored*
+      # cache to already exactly match build-windows's own conan install
+      # wasn't reliable if cmake_check_build_system (below) decides to
+      # reconfigure during cpack's preinstall pass. Running the exact same
+      # `conan install` here guarantees a fully consistent environment.
+      - name: Conan install
+        run: conan install . -s build_type=Release -s "tomlplusplus/*:compiler.cppstd=20" -s "lunasvg/*:compiler.cppstd=20" -c tools.cmake.cmaketoolchain:generator=Ninja --build=missing
 
       - name: Download build directory (Release)
         uses: actions/download-artifact@v7
